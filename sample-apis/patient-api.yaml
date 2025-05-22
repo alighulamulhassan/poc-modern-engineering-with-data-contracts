@@ -1,0 +1,78 @@
+openapi: 3.0.1
+info:
+  title: MHRA Patient API
+  description: Sample FHIR-based Patient API for MHRA
+  version: 1.0.0
+servers:
+  - url: https://api.mhra.example.com/v1
+paths:
+  /Patient:
+    get:
+      summary: Get a list of patients
+      operationId: listPatients
+      responses:
+        '200':
+          description: A list of patients
+          content:
+            application/fhir+json:
+              schema:
+                type: object
+                properties:
+                  resourceType:
+                    type: string
+                    example: Bundle
+                  entry:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Patient'
+  /Patient/{id}:
+    get:
+      summary: Get a patient by ID
+      operationId: getPatientById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Patient resource
+          content:
+            application/fhir+json:
+              schema:
+                $ref: '#/components/schemas/Patient'
+components:
+  schemas:
+    Patient:
+      type: object
+      required:
+        - resourceType
+        - id
+      properties:
+        resourceType:
+          type: string
+          example: Patient
+        id:
+          type: string
+          example: 12345
+        name:
+          type: array
+          items:
+            type: object
+            properties:
+              family:
+                type: string
+                example: Smith
+              given:
+                type: array
+                items:
+                  type: string
+                example: ["John"]
+        gender:
+          type: string
+          example: male
+        birthDate:
+          type: string
+          format: date
+          example: 1980-01-01

@@ -1,0 +1,60 @@
+# GitHub Actions workflow to deploy OpenAPI specs to Azure API Management and enable mocking
+
+name: Deploy OpenAPI to Azure APIM with Mocking
+
+on:
+  push:
+    paths:
+      - 'sample-apis/*.yaml'
+      - '.github/workflows/deploy-apim-mock.yaml'
+    branches:
+      - main
+
+jobs:
+  deploy-apim-mock:
+    runs-on: ubuntu-latest
+    env:
+      AZURE_APIM_RESOURCE_GROUP: ${{ secrets.AZURE_APIM_RESOURCE_GROUP }}
+      AZURE_APIM_SERVICE_NAME: ${{ secrets.AZURE_APIM_SERVICE_NAME }}
+      AZURE_CREDENTIALS: ${{ secrets.AZURE_CREDENTIALS }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Azure CLI
+        uses: azure/login@v2
+        with:
+          creds: ${{ env.AZURE_CREDENTIALS }}
+
+      - name: Deploy OpenAPI spec to APIM and enable mocking
+        run: |
+          for api_file in sample-apis/*.yaml; do
+            api_name=$(basename "$api_file" .yaml)
+            echo "Deploying $api_file as $api_name to APIM..."
+            az apim api import \
+              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
+              --service-name "$AZURE_APIM_SERVICE_NAME" \
+              --path "$api_name" \
+              --api-id "$api_name" \
+              --specification-format OpenApi \
+              --specification-path "$api_file" \
+              --api-revision 1 \
+              --service-url "https://mock.backend/" || true
+            echo "Enabling mocking for $api_name..."
+            az apim api operation update \
+              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
+              --service-name "$AZURE_APIM_SERVICE_NAME" \
+              --api-id "$api_name" \
+              --operation-id listPatients \
+              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
+            az apim api operation update \
+              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
+              --service-name "$AZURE_APIM_SERVICE_NAME" \
+              --api-id "$api_name" \
+              --operation-id getPatientById \
+              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
+          done
+        shell: bash
+
+      - name: Logout from Azure
+        run: az logout
