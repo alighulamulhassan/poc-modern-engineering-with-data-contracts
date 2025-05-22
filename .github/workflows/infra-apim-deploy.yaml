@@ -62,30 +62,34 @@ jobs:
     needs: infrastructure-deployment
     runs-on: ubuntu-latest
     environment: dev
+    defaults:
+      run:
+        working-directory: infra
+    env:
+      AZURE_APIM_RESOURCE_GROUP: ${{ secrets.AZURE_APIM_RESOURCE_GROUP }}
+      AZURE_APIM_SERVICE_NAME: ${{ secrets.AZURE_APIM_SERVICE_NAME }}
+      AZURE_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
+
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Node.js
-        uses: actions/setup-node@v3
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
         with:
           node-version: '20'
 
       - name: Install dependencies
-        run: npm install -g @stoplight/prism-cli js-yaml
+        run: |
+          npm install js-yaml @stoplight/prism-cli
 
-      - name: Set up Azure CLI
+      - name: Azure CLI login
         uses: azure/login@v2
         with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
+          creds: '{"clientId":"${{ secrets.ARM_CLIENT_ID }}","clientSecret":"${{ secrets.ARM_CLIENT_SECRET }}","subscriptionId":"${{ secrets.ARM_SUBSCRIPTION_ID }}","tenantId":"${{ secrets.ARM_TENANT_ID }}"}'
 
-      - name: Patch APIM operations with dynamic mock policies
-        env:
-          AZURE_APIM_RESOURCE_GROUP: ${{ secrets.AZURE_APIM_RESOURCE_GROUP }}
-          AZURE_APIM_SERVICE_NAME: ${{ secrets.AZURE_APIM_SERVICE_NAME }}
-          AZURE_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
-        run: |
-          node infra/generate-mocks.js
+      - name: Generate and upload mock responses
+        run: npm run generate-mocks
 
       - name: Logout from Azure
         run: az logout

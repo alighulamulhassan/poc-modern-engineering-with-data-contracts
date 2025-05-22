@@ -1,5 +1,16 @@
 {
+  "name": "mhra-poc-azure-apim-mock-automation",
+  "version": "1.0.0",
+  "private": true,
+  "type": "commonjs",
+  "engines": {
+    "node": ">=20.0.0"
+  },
   "dependencies": {
-    "@stoplight/prism-cli": "^5.14.2"
+    "@stoplight/prism-cli": "^5.14.2",
+    "js-yaml": "^4.1.0"
+  },
+  "scripts": {
+    "generate-mocks": "node generate-mocks.js"
   }
 }

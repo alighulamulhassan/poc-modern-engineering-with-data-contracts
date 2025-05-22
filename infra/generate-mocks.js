@@ -14,15 +14,41 @@ const AZURE_APIM_RESOURCE_GROUP = process.env.AZURE_APIM_RESOURCE_GROUP;
 const AZURE_APIM_SERVICE_NAME = process.env.AZURE_APIM_SERVICE_NAME;
 const AZURE_SUBSCRIPTION_ID = process.env.AZURE_SUBSCRIPTION_ID;
 
+// Validate required environment variables
+function validateEnvironment() {
+  const requiredVars = ['AZURE_APIM_RESOURCE_GROUP', 'AZURE_APIM_SERVICE_NAME', 'AZURE_SUBSCRIPTION_ID'];
+  const missingVars = requiredVars.filter(varName => !process.env[varName]);
+  
+  if (missingVars.length > 0) {
+    console.error('Missing required environment variables:', missingVars.join(', '));
+    process.exit(1);
+  }
+}
+
 async function getAzureToken() {
-  return execSync('az account get-access-token --query accessToken -o tsv').toString().trim();
+  try {
+    return execSync('az account get-access-token --query accessToken -o tsv').toString().trim();
+  } catch (error) {
+    console.error('Failed to get Azure token:', error.message);
+    process.exit(1);
+  }
 }
 
 async function generateMockResponse(apiSpec, path, method, operationId) {
   try {
     // Get the operation from the spec
-    const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
-    const operation = spec.paths[path][method.toLowerCase()];
+    const specContent = fs.readFileSync(apiSpec, 'utf8');
+    let spec;
+    try {
+      spec = yaml.load(specContent);
+    } catch (yamlError) {
+      throw new Error(`Failed to parse YAML from ${apiSpec}: ${yamlError.message}`);
+    }
+
+    const operation = spec.paths[path]?.[method.toLowerCase()];
+    if (!operation) {
+      throw new Error(`Operation not found: ${method} ${path}`);
+    }
     
     // For listPatients, return a bundle with multiple patients
     if (operationId === 'listPatients') {
@@ -102,38 +128,49 @@ async function setNamedValue(name, value, token) {
   }
 }
 
-async function processSpecs() {
+async function main() {
   try {
+    validateEnvironment();
+    
     const token = await getAzureToken();
-    const files = fs.readdirSync(apisDir).filter(f => f.endsWith('.yaml') || f.endsWith('.yml'));
+    const files = fs.readdirSync(apisDir).filter(file => file.endsWith('.yaml'));
 
     for (const file of files) {
-      const apiPath = path.join(apisDir, file);
-      const spec = yaml.load(fs.readFileSync(apiPath, 'utf8'));
-      const apiName = spec.info.title.toLowerCase().replace(/ /g, '-');
+      const apiSpec = path.join(apisDir, file);
+      console.log(`Processing API spec: ${file}`);
 
-      console.log(`Processing API: ${apiName}`);
-
+      const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
+      
       for (const [path, pathObj] of Object.entries(spec.paths)) {
         for (const [method, operation] of Object.entries(pathObj)) {
-          if (operation.operationId) {
-            console.log(`Generating mock for ${method.toUpperCase()} ${path}`);
+          const operationId = operation.operationId;
+          if (!operationId) {
+            console.warn(`Warning: Missing operationId for ${method} ${path}`);
+            continue;
+          }
+
+          try {
+            const mockResponse = await generateMockResponse(apiSpec, path, method, operationId);
+            const mockResponseStr = JSON.stringify(mockResponse);
+            const namedValueKey = `mock-${operationId}`;
             
-            const mockResponse = await generateMockResponse(apiPath, path, method, operation.operationId);
-            const variableName = `${apiName}-${operation.operationId}-mock`;
-            
-            await setNamedValue(variableName, JSON.stringify(mockResponse), token);
-            console.log(`Set mock response for ${variableName}`);
+            await setNamedValue(namedValueKey, mockResponseStr, token);
+          } catch (error) {
+            console.error(`Failed to process operation ${operationId}:`, error);
+            // Continue with other operations even if one fails
           }
         }
       }
     }
 
-    console.log('All mock responses generated and stored in APIM');
+    console.log('Successfully generated and uploaded all mock responses');
   } catch (error) {
-    console.error('Error processing specs:', error);
+    console.error('Failed to generate mocks:', error);
     process.exit(1);
   }
 }
 
-processSpecs();
+main().catch(error => {
+  console.error('Unhandled error:', error);
+  process.exit(1);
+});
