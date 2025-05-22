@@ -34,6 +34,13 @@ jobs:
           az config unset extension.use_dynamic_install || true
         shell: bash
 
+      - name: Debug Azure CLI config and environment
+        run: |
+          echo "Azure CLI config:" && az config list
+          echo "Environment variables:" && env | grep -i apim || true
+          az config unset apim.api-version || true
+        shell: bash
+
       - name: Deploy OpenAPI spec to APIM and enable mocking
         run: |
           for api_file in sample-apis/*.yaml; do
