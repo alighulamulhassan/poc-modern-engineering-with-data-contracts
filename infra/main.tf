@@ -32,10 +32,7 @@ resource "azurerm_api_management_api_operation_policy" "mock_policy" {
   <inbound>
     <base />
     <mock-response status-code="200" content-type="application/fhir+json">
-      <body>@{{
-        string json = "{\"resourceType\": \"Bundle\", \"entry\": [ { \"resource\": { \"id\": \"" + Guid.NewGuid() + "\", \"name\": [ { \"family\": \"Doe\", \"given\": [ \"John\" ] } ] } } ] }";
-        return json;
-      }}</body>
+      <body>sample</body>
     </mock-response>
   </inbound>
   <backend>
