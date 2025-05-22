@@ -1,0 +1,27 @@
+<policies>
+  <inbound>
+    <base />
+    <set-variable name="mockResponse" value="@(context.Variables.GetValueOrDefault&lt;string&gt;(&quot;${api_name}-${operation_id}-mock&quot;))" />
+    <choose>
+      <when condition="@(context.Variables[&quot;mockResponse&quot;] != null)">
+        <mock-response status-code="200" content-type="application/json">
+          <body>@(context.Variables["mockResponse"])</body>
+        </mock-response>
+      </when>
+      <otherwise>
+        <mock-response status-code="404" content-type="application/json">
+          <body>{"error": "No mock response found for this operation"}</body>
+        </mock-response>
+      </otherwise>
+    </choose>
+  </inbound>
+  <backend>
+    <base />
+  </backend>
+  <outbound>
+    <base />
+  </outbound>
+  <on-error>
+    <base />
+  </on-error>
+</policies>

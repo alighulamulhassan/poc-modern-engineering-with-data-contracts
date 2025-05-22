@@ -18,27 +18,53 @@ async function getAzureToken() {
   return execSync('az account get-access-token --query accessToken -o tsv').toString().trim();
 }
 
-async function generateMockResponse(apiSpec, path, method) {
+async function generateMockResponse(apiSpec, path, method, operationId) {
   try {
-    // Start Prism server
-    const prismPort = 4010;
-    const serverProcess = execSync(`npx @stoplight/prism-cli mock -p ${prismPort} "${apiSpec}"`, {
-      stdio: 'pipe',
-      encoding: 'utf8'
-    });
+    // Get the operation from the spec
+    const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
+    const operation = spec.paths[path][method.toLowerCase()];
+    
+    // For listPatients, return a bundle with multiple patients
+    if (operationId === 'listPatients') {
+      return {
+        resourceType: "Bundle",
+        type: "searchset",
+        total: 2,
+        entry: [
+          {
+            resource: {
+              resourceType: "Patient",
+              id: "12345",
+              name: [{ family: "Smith", given: ["John"] }],
+              gender: "male",
+              birthDate: "1980-01-02"
+            }
+          },
+          {
+            resource: {
+              resourceType: "Patient",
+              id: "67890",
+              name: [{ family: "Johnson", given: ["Sarah"] }],
+              gender: "female",
+              birthDate: "1992-03-15"
+            }
+          }
+        ]
+      };
+    }
+    
+    // For getPatientById, return a single patient
+    if (operationId === 'getPatientById') {
+      return {
+        resourceType: "Patient",
+        id: "12345",
+        name: [{ family: "Smith", given: ["John"] }],
+        gender: "male",
+        birthDate: "1980-01-02"
+      };
+    }
 
-    // Wait for server to start
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    // Make request to get mock response
-    const mockResponse = execSync(`curl -s -X ${method.toUpperCase()} "http://localhost:${prismPort}${path}"`, {
-      encoding: 'utf8'
-    });
-
-    // Kill Prism server
-    execSync('pkill -f prism-cli');
-
-    return JSON.parse(mockResponse);
+    throw new Error(`Unknown operation: ${operationId}`);
   } catch (error) {
     console.error(`Error generating mock for ${method} ${path}:`, error);
     throw error;
@@ -52,20 +78,24 @@ async function setNamedValue(name, value, token) {
     const body = {
       properties: {
         displayName: name,
-        value: JSON.stringify(value),
+        value: value, // Value is already stringified by the caller
         secret: false
       }
     };
 
+    // Escape single quotes in the JSON
+    const escapedBody = JSON.stringify(body).replace(/'/g, "'\\''");
+
     const result = execSync(`curl -X PUT "${url}" \
       -H "Authorization: Bearer ${token}" \
       -H "Content-Type: application/json" \
-      -d '${JSON.stringify(body)}'`, {
+      -H "Accept: application/json" \
+      -d '${escapedBody}'`, {
       encoding: 'utf8'
     });
 
     console.log(`Successfully set named value ${name}`);
-    return JSON.parse(result);
+    return result;
   } catch (error) {
     console.error(`Error setting named value ${name}:`, error);
     throw error;
@@ -89,10 +119,10 @@ async function processSpecs() {
           if (operation.operationId) {
             console.log(`Generating mock for ${method.toUpperCase()} ${path}`);
             
-            const mockResponse = await generateMockResponse(apiPath, path, method);
+            const mockResponse = await generateMockResponse(apiPath, path, method, operation.operationId);
             const variableName = `${apiName}-${operation.operationId}-mock`;
             
-            await setNamedValue(variableName, mockResponse, token);
+            await setNamedValue(variableName, JSON.stringify(mockResponse), token);
             console.log(`Set mock response for ${variableName}`);
           }
         }
