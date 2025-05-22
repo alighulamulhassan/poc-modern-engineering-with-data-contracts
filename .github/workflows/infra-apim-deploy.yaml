@@ -43,7 +43,8 @@ jobs:
       - name: Terraform Apply
         env:
             TF_LOG: DEBUG
-        run: terraform apply \
+        run: |
+          terraform apply \
             -var="apim_name=${{ secrets.APIM_NAME }}" \
             -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
             -var="location=${{ secrets.AZURE_LOCATION }}"
