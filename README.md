@@ -76,4 +76,4 @@ Sample Azure Functions are provided for the `/Patient` and `/Patient/{id}` endpo
 
 ---
 
-*This project is a proof of concept for modernizing API-driven development workflows using Azure APIM and Wiremock.*
+*This project is a proof of concept for modernizing API-driven development workflows using Azure APIM mocking*
