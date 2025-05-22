@@ -41,20 +41,23 @@ jobs:
               --specification-format OpenApi \
               --specification-path "$api_file" \
               --api-revision 1 \
-              --service-url "https://mock.backend/" || true
+              --service-url "https://mock.backend/" \
+              --api-version 2024-03-01 || true
             echo "Enabling mocking for $api_name..."
             az apim api operation update \
               --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
               --service-name "$AZURE_APIM_SERVICE_NAME" \
               --api-id "$api_name" \
               --operation-id listPatients \
-              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
+              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" \
+              --api-version 2024-03-01 || true
             az apim api operation update \
               --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
               --service-name "$AZURE_APIM_SERVICE_NAME" \
               --api-id "$api_name" \
               --operation-id getPatientById \
-              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
+              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" \
+              --api-version 2024-03-01 || true
           done
         shell: bash
 
