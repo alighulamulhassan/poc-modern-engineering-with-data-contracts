@@ -25,10 +25,9 @@ jobs:
 
       - name: Deploy OpenAPI spec to APIM and enable mocking
         env:
-          AZURE_APIM_RESOURCE_GROUP: ${{ env.AZURE_APIM_RESOURCE_GROUP }}
-          AZURE_APIM_SERVICE_NAME: ${{ env.AZURE_APIM_SERVICE_NAME }}
-          AZURE_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
-          AZURE_TOKEN: ${{ env.AZURE_TOKEN }}
+          AZURE_APIM_RESOURCE_GROUP: ${{ secrets.AZURE_APIM_RESOURCE_GROUP }}
+          AZURE_APIM_SERVICE_NAME: ${{ secrets.AZURE_APIM_SERVICE_NAME }}
+          AZURE_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         run: |
           # Get Azure access token
           export AZURE_TOKEN=$(az account get-access-token --query accessToken -o tsv)
