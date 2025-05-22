@@ -40,23 +40,41 @@ resource "azurerm_api_management_api" "apis" {
   }
 }
 
-# Apply mock policies to all APIs
-resource "azurerm_api_management_api_operation_policy" "mock_policies" {
-  for_each = {
-    for api in azurerm_api_management_api.apis : api.name => api
+# Extract operations from OpenAPI specs
+locals {
+  api_operations = flatten([
+    for file_name, spec in local.api_specs : [
+      for path, path_info in spec.paths : [
+        for method, operation in path_info : {
+          api_name = replace(lower(spec.info.title), " ", "-")
+          operation_id = operation.operationId
+          path = path
+          method = method
+        } if operation.operationId != null
+      ]
+    ]
+  ])
+
+  operation_policies = {
+    for op in local.api_operations : 
+    "${op.api_name}-${op.operation_id}" => op
   }
+}
+
+# Apply mock policies to individual operations
+resource "azurerm_api_management_api_operation_policy" "mock_policies" {
+  for_each = local.operation_policies
   
-  api_name            = each.value.name
+  api_name            = each.value.api_name
   api_management_name = var.apim_name
   resource_group_name = var.resource_group_name
-  # We'll get the operation_id from the generate-mocks.js script output
-  operation_id        = "*"  # This will apply to all operations
+  operation_id        = each.value.operation_id
   xml_content         = <<XML
 <policies>
   <inbound>
     <base />
     <mock-response status-code="200" content-type="application/json">
-      <body>@(context.Variables.GetValueOrDefault<string>("mock-response"))</body>
+      <body>@(context.Variables.GetValueOrDefault<string>("${each.value.api_name}-${each.value.operation_id}-mock"))</body>
     </mock-response>
   </inbound>
   <backend>
