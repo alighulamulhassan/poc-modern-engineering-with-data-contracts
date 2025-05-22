@@ -23,66 +23,32 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Update Azure CLI
-        run: |
-          az upgrade --yes
-        shell: bash
-
-      - name: Clear Azure CLI cache
-        run: |
-          az cache purge || true
-          az config unset extension.use_dynamic_install || true
-        shell: bash
-
-      - name: Debug Azure CLI config and environment
-        run: |
-          echo "Azure CLI config:" && az config get
-          echo "Environment variables:" && env | grep -i apim || true
-          az config unset apim.api-version || true
-        shell: bash
-
-      - name: Force fresh Azure CLI install
-        run: |
-          sudo apt-get update
-          sudo apt-get remove -y azure-cli
-          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
-        shell: bash
-
-      - name: Show APIM provider API versions
-        run: |
-          az provider register --namespace Microsoft.ApiManagement
-          az provider show --namespace Microsoft.ApiManagement --query "resourceTypes[].apiVersions"
-        shell: bash
-
       - name: Deploy OpenAPI spec to APIM and enable mocking
         env:
-          AZURE_APIM_API_VERSION: 2024-05-01
+          AZURE_APIM_RESOURCE_GROUP: ${{ env.AZURE_APIM_RESOURCE_GROUP }}
+          AZURE_APIM_SERVICE_NAME: ${{ env.AZURE_APIM_SERVICE_NAME }}
+          AZURE_SUBSCRIPTION_ID: ${{ env.AZURE_SUBSCRIPTION_ID }}
+          AZURE_TOKEN: ${{ env.AZURE_TOKEN }}
         run: |
+          # Get Azure access token
+          export AZURE_TOKEN=$(az account get-access-token --query accessToken -o tsv)
           for api_file in sample-apis/*.yaml; do
             api_name=$(basename "$api_file" .yaml)
-            echo "Deploying $api_file as $api_name to APIM..."
-            az apim api import \
-              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
-              --service-name "$AZURE_APIM_SERVICE_NAME" \
-              --path "$api_name" \
-              --api-id "$api_name" \
-              --specification-format OpenApi \
-              --specification-path "$api_file" \
-              --api-revision 1 \
-              --service-url "https://mock.backend/" || true
-            echo "Enabling mocking for $api_name..."
-            az apim api operation update \
-              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
-              --service-name "$AZURE_APIM_SERVICE_NAME" \
-              --api-id "$api_name" \
-              --operation-id listPatients \
-              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
-            az apim api operation update \
-              --resource-group "$AZURE_APIM_RESOURCE_GROUP" \
-              --service-name "$AZURE_APIM_SERVICE_NAME" \
-              --api-id "$api_name" \
-              --operation-id getPatientById \
-              --set "request.representations=[]" "responses[0].representations[0].contentType=application/fhir+json" "responses[0].representations[0].sample=MOCK" || true
+            echo "Deploying $api_file as $api_name to APIM via REST API..."
+            # Import API via REST
+            curl -X PUT \
+              -H "Authorization: Bearer $AZURE_TOKEN" \
+              -H "Content-Type: application/json" \
+              "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/apis/$api_name?api-version=2024-05-01" \
+              -d @"$api_file"
+            # Enable mocking (example, you may need to adjust the body for your operation)
+            for op in listPatients getPatientById; do
+              curl -X PATCH \
+                -H "Authorization: Bearer $AZURE_TOKEN" \
+                -H "Content-Type: application/json" \
+                "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/apis/$api_name/operations/$op?api-version=2024-05-01" \
+                -d '{"properties":{"request":{"representations":[]},"responses":[{"representations":[{"contentType":"application/fhir+json","sample":"MOCK"}]}]}}'
+            done
           done
         shell: bash
 
