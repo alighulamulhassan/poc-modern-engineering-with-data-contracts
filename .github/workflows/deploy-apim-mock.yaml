@@ -41,6 +41,19 @@ jobs:
           az config unset apim.api-version || true
         shell: bash
 
+      - name: Force fresh Azure CLI install
+        run: |
+          sudo apt-get update
+          sudo apt-get remove -y azure-cli
+          curl -sL https://aka.ms/InstallAzureCLIDeb | sudo bash
+        shell: bash
+
+      - name: Show APIM provider API versions
+        run: |
+          az provider register --namespace Microsoft.ApiManagement
+          az provider show --namespace Microsoft.ApiManagement --query "resourceTypes[].apiVersions"
+        shell: bash
+
       - name: Deploy OpenAPI spec to APIM and enable mocking
         env:
           AZURE_APIM_API_VERSION: 2024-03-01
