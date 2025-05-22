@@ -36,7 +36,7 @@ jobs:
 
       - name: Debug Azure CLI config and environment
         run: |
-          echo "Azure CLI config:" && az config list
+          echo "Azure CLI config:" && az config get
           echo "Environment variables:" && env | grep -i apim || true
           az config unset apim.api-version || true
         shell: bash
