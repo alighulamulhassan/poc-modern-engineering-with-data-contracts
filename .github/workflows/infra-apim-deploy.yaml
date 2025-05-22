@@ -32,7 +32,7 @@ jobs:
 
       - name: Terraform Init
         env:
-            TF_LOG: DEBUG
+            TF_LOG: INFO
         run: |
             terraform init \
             -backend-config="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
@@ -40,12 +40,21 @@ jobs:
             -backend-config="container_name=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}" \
             -backend-config="key=terraform.tfstate"
 
+      - name: Terraform Plan
+        env:
+            TF_LOG: INFO
+        run: |
+          terraform plan \
+            -var="apim_name=${{ secrets.AZURE_APIM_SERVICE_NAME }}" \
+            -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
+            -var="location=${{ secrets.AZURE_LOCATION }}"
+
       - name: Terraform Apply
         env:
-            TF_LOG: DEBUG
+            TF_LOG: INFO
         run: |
-          terraform apply \
-            -var="apim_name=${{ secrets.APIM_NAME }}" \
+          terraform apply -auto-approve \
+            -var="apim_name=${{ secrets.AZURE_APIM_SERVICE_NAME }}" \
             -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
             -var="location=${{ secrets.AZURE_LOCATION }}"
 
