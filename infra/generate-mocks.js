@@ -50,7 +50,7 @@ async function generateMockResponse(apiSpec, path, method, operationId) {
       throw new Error(`Operation not found: ${method} ${path}`);
     }
     
-    // For listPatients, return a bundle with multiple patients
+    // Patient API mock responses
     if (operationId === 'listPatients') {
       return {
         resourceType: "Bundle",
@@ -79,7 +79,6 @@ async function generateMockResponse(apiSpec, path, method, operationId) {
       };
     }
     
-    // For getPatientById, return a single patient
     if (operationId === 'getPatientById') {
       return {
         resourceType: "Patient",
@@ -87,6 +86,54 @@ async function generateMockResponse(apiSpec, path, method, operationId) {
         name: [{ family: "Smith", given: ["John"] }],
         gender: "male",
         birthDate: "1980-01-02"
+      };
+    }
+
+    // Products API mock responses
+    if (operationId === 'listProducts') {
+      return [
+        {
+          id: "MED-123",
+          name: "Paracetamol 500mg",
+          category: "MEDICATION",
+          status: "AVAILABLE",
+          description: "Pain relief medication",
+          manufacturer: "PharmaCorp Ltd",
+          expiryDate: "2025-12-31"
+        },
+        {
+          id: "DEV-456",
+          name: "Digital Thermometer",
+          category: "DEVICE",
+          status: "AVAILABLE",
+          description: "Clinical grade thermometer",
+          manufacturer: "MedTech Inc",
+          expiryDate: "2026-06-30"
+        }
+      ];
+    }
+
+    if (operationId === 'getProductById') {
+      return {
+        id: "MED-123",
+        name: "Paracetamol 500mg",
+        category: "MEDICATION",
+        status: "AVAILABLE",
+        description: "Pain relief medication",
+        manufacturer: "PharmaCorp Ltd",
+        expiryDate: "2025-12-31"
+      };
+    }
+
+    if (operationId === 'createProduct') {
+      return {
+        id: "MED-999",
+        name: "New Product",
+        category: "MEDICATION",
+        status: "AVAILABLE",
+        description: "Newly created product",
+        manufacturer: "Test Manufacturer",
+        expiryDate: "2026-12-31"
       };
     }
 
