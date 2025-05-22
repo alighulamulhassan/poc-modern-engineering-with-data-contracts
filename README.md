@@ -34,6 +34,47 @@ README.md            # Project overview and instructions
 - **GitHub Actions** (`.github/workflows/`):
   - `deploy-apim-mock.yaml`: Imports OpenAPI specs and enables APIM mocking.
 
+## Automated Dynamic Mocking with Prism and Terraform
+
+This project automatically generates dynamic mock responses for each OpenAPI spec and injects them into Azure API Management (APIM) policies using Terraform. The process is fully automated via GitHub Actions and requires no manual steps after a PR is merged.
+
+### How it Works
+
+1. **OpenAPI Specs**: Place your OpenAPI 3.x YAML files in the `sample-apis/` directory.
+2. **Mock Generation**: On every push to `main`, the GitHub Actions workflow runs `infra/generate-mocks.js`, which:
+    - Uses [Prism](https://github.com/stoplightio/prism) to generate mock responses for each API operation.
+    - Updates `infra/main.tf` to inject the generated mock payloads into the APIM mock policy.
+3. **Terraform Apply**: The workflow then runs `terraform apply` to deploy the updated policies to Azure APIM.
+
+### Local Development
+
+To run the mock generation and update policies locally:
+
+```sh
+cd infra
+npm install -g @stoplight/prism-cli
+node generate-mocks.js
+terraform init
+terraform apply
+```
+
+### CI/CD Automation
+
+The workflow is defined in `.github/workflows/deploy.yml` and will:
+- Install dependencies
+- Generate mocks and update Terraform
+- Deploy to Azure APIM
+
+### Adding a New API
+
+1. Add your OpenAPI YAML file to `sample-apis/`.
+2. Commit and push to `main` (or open a PR and merge).
+3. The workflow will automatically generate the mock and update APIM.
+
+---
+
+For more details, see `infra/generate-mocks.js` and the workflow file.
+
 ## Future Work
 - Evaluate and document the pros and cons of Azure APIM vs. Wiremock for different use cases.
 - Automate the process of generating and deploying mocks from OpenAPI specs.

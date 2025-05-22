@@ -30,6 +30,13 @@ jobs:
       - name: Set up Terraform
         uses: hashicorp/setup-terraform@v3
 
+      - name: Install Prism CLI
+        run: npm install -g @stoplight/prism-cli
+
+      - name: Generate API mocks and update Terraform
+        run: node ../infra/generate-mocks.js
+        working-directory: ${{ github.workspace }}
+
       - name: Terraform Init
         env:
             TF_LOG: INFO
@@ -58,7 +65,7 @@ jobs:
             -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
             -var="location=${{ secrets.AZURE_LOCATION }}"
 
-  apim-deploy:
+  apim-mock-patch:
     needs: infrastructure-deployment
     runs-on: ubuntu-latest
     environment: dev
@@ -66,39 +73,26 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v3
+        with:
+          node-version: '20'
+
+      - name: Install dependencies
+        run: npm install -g @stoplight/prism-cli js-yaml
+
       - name: Set up Azure CLI
         uses: azure/login@v2
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
-      - name: Deploy OpenAPI spec to APIM and enable mocking
+      - name: Patch APIM operations with dynamic mock policies
         env:
           AZURE_APIM_RESOURCE_GROUP: ${{ secrets.AZURE_APIM_RESOURCE_GROUP }}
           AZURE_APIM_SERVICE_NAME: ${{ secrets.AZURE_APIM_SERVICE_NAME }}
           AZURE_SUBSCRIPTION_ID: ${{ secrets.ARM_SUBSCRIPTION_ID }}
         run: |
-          export AZURE_TOKEN=$(az account get-access-token --query accessToken -o tsv)
-          for api_file in sample-apis/*.yaml; do
-            api_name=$(basename "$api_file" .yaml)
-            api_path="$api_name"
-            openapi_content=$(python3 -c "import json,sys; print(json.dumps(open('$api_file').read()))")
-            echo "Importing $api_file as $api_name to APIM via REST API..."
-            curl -X POST \
-              -H "Authorization: Bearer $AZURE_TOKEN" \
-              -H "Content-Type: application/json" \
-              "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/importOpenApi?api-version=2024-05-01" \
-              -d "{\"properties\":{\"format\":\"openapi+yaml\",\"value\":$openapi_content,\"path\":\"$api_path\"}}"
-            echo "Waiting for API to be available..."
-            sleep 20
-            for op in listPatients getPatientById; do
-              curl -X PATCH \
-                -H "Authorization: Bearer $AZURE_TOKEN" \
-                -H "Content-Type: application/json" \
-                "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/apis/$api_name/operations/$op?api-version=2024-05-01" \
-                -d '{"properties":{"request":{"representations":[]},"responses":[{"representations":[{"contentType":"application/fhir+json","sample":"MOCK"}]}]}}'
-            done
-          done
-        shell: bash
+          node infra/patch-apim-mocks.js
 
       - name: Logout from Azure
         run: az logout
