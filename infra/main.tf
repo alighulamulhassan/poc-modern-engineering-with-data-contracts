@@ -28,17 +28,17 @@ resource "azurerm_service_plan" "function" {
   sku_name            = "Y1"
 }
 
-resource "azurerm_function_app" "mhra" {
+resource "azurerm_linux_function_app" "mhra" {
   name                       = "mhra-function-app-${random_id.suffix.hex}"
   location                   = var.location
   resource_group_name        = var.resource_group_name
-  app_service_plan_id        = azurerm_service_plan.function.id
+  service_plan_id            = azurerm_service_plan.function.id
   storage_account_name       = azurerm_storage_account.function.name
   storage_account_access_key = azurerm_storage_account.function.primary_access_key
-  version                    = "~4"
-  os_type                    = "linux"
   site_config {
-    linux_fx_version = "Node|18-lts"
+    application_stack {
+      node_version = "18"
+    }
   }
   identity {
     type = "SystemAssigned"
@@ -57,7 +57,7 @@ resource "azurerm_api_management_api" "mhra_patient" {
     content_format = "openapi"
     content_value  = file("${path.module}/../sample-apis/patient-api.yaml")
   }
-  service_url = azurerm_function_app.mhra.default_hostname
+  service_url = azurerm_linux_function_app.mhra.default_hostname
 }
 
 resource "azurerm_api_management_api_operation_policy" "mock_policy" {
