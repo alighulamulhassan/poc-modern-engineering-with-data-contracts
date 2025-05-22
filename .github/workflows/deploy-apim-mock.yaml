@@ -40,6 +40,8 @@ jobs:
               -H "Content-Type: application/json" \
               "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/importOpenApi?api-version=2024-05-01" \
               -d "{\"properties\":{\"format\":\"openapi\",\"value\":$openapi_content,\"path\":\"$api_path\"}}"
+            echo "Waiting for API to be available..."
+            sleep 20
             for op in listPatients getPatientById; do
               curl -X PATCH \
                 -H "Authorization: Bearer $AZURE_TOKEN" \
