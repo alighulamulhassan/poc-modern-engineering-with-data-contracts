@@ -24,51 +24,15 @@ This project demonstrates how to decouple the development lifecycle of the front
 ## Directory Structure
 
 ```
-function/
-  Patient/           # /Patient endpoint (TypeScript Azure Function)
-    index.ts
-    function.json
-  PatientById/       # /Patient/{id} endpoint (TypeScript Azure Function)
-    index.ts
-    function.json
-  host.json
-  local.settings.json
-  package.json
-  tsconfig.json
-  requirements.txt   # (legacy, not used in Node.js)
-  .gitignore
-infra/               # Terraform for Azure infra and APIM
+infra/               # Terraform for Azure APIM and mock policies
 sample-apis/         # OpenAPI specs (FHIR)
+README.md            # Project overview and instructions
 ```
 
-## Azure Function Implementation
-
-Sample Azure Functions are provided for the `/Patient` and `/Patient/{id}` endpoints. These log the input/args and return a FHIR-compliant response with the API version in the logs.
-
-- `function/Patient/`: Handles GET `/Patient` (returns a FHIR Bundle)
-- `function/PatientById/`: Handles GET `/Patient/{id}` (returns a FHIR Patient resource)
-
-## Running Locally (Node.js/TypeScript)
-
-1. Install dependencies:
-   ```sh
-   cd function
-   npm install
-   ```
-2. Build TypeScript:
-   ```sh
-   npm run build
-   ```
-3. Start Azure Functions locally:
-   ```sh
-   npm start
-   ```
-
 ## Infrastructure & CI/CD
-- **Terraform** (`infra/`): Provisions Azure Function infra, registers APIs in APIM, and links them.
+- **Terraform** (`infra/`): Provisions Azure APIM and configures mock policies.
 - **GitHub Actions** (`.github/workflows/`):
-  - `deploy-function-apim.yaml`: Deploys function code and runs Terraform.
-  - `deploy-apim-mock.yaml`: (Optional) Imports OpenAPI specs and enables APIM mocking.
+  - `deploy-apim-mock.yaml`: Imports OpenAPI specs and enables APIM mocking.
 
 ## Future Work
 - Evaluate and document the pros and cons of Azure APIM vs. Wiremock for different use cases.

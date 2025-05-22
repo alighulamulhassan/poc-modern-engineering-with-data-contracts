@@ -1,4 +1,4 @@
-# Terraform configuration for Azure Function App and APIM API registration
+# Terraform configuration for APIM API registration and mocking only
 
 provider "azurerm" {
   features {}
@@ -6,43 +6,6 @@ provider "azurerm" {
 
 terraform {
   backend "azurerm" {}
-}
-
-resource "azurerm_storage_account" "function" {
-  name                     = "mhrafuncstorage${random_id.suffix.hex}"
-  resource_group_name      = var.resource_group_name
-  location                 = var.location
-  account_tier             = "Standard"
-  account_replication_type = "LRS"
-}
-
-resource "random_id" "suffix" {
-  byte_length = 4
-}
-
-resource "azurerm_service_plan" "function" {
-  name                = "mhra-function-plan"
-  location            = var.location
-  resource_group_name = var.resource_group_name
-  os_type             = "Linux"
-  sku_name            = "Y1"
-}
-
-resource "azurerm_linux_function_app" "mhra" {
-  name                       = "mhra-function-app-${random_id.suffix.hex}"
-  location                   = var.location
-  resource_group_name        = var.resource_group_name
-  service_plan_id            = azurerm_service_plan.function.id
-  storage_account_name       = azurerm_storage_account.function.name
-  storage_account_access_key = azurerm_storage_account.function.primary_access_key
-  site_config {
-    application_stack {
-      node_version = "18"
-    }
-  }
-  identity {
-    type = "SystemAssigned"
-  }
 }
 
 resource "azurerm_api_management_api" "mhra_patient" {
@@ -57,7 +20,6 @@ resource "azurerm_api_management_api" "mhra_patient" {
     content_format = "openapi"
     content_value  = file("${path.module}/../sample-apis/patient-api.yaml")
   }
-  service_url = azurerm_linux_function_app.mhra.default_hostname
 }
 
 resource "azurerm_api_management_api_operation_policy" "mock_policy" {

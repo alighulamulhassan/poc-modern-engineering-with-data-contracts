@@ -1,3 +1,1 @@
-output "function_app_name" {
-  value = azurerm_linux_function_app.mhra.name
-}
+# No function app output needed since function app is removed

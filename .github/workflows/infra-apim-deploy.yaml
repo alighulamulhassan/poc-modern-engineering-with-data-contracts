@@ -58,42 +58,8 @@ jobs:
             -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
             -var="location=${{ secrets.AZURE_LOCATION }}"
 
-  azure-functions-deployment:
-    needs: infrastructure-deployment
-    runs-on: ubuntu-latest
-    environment: dev
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Set up Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '18'
-
-      - name: Install dependencies
-        run: |
-          cd function
-          npm install
-          npm run build
-
-      - name: Install Azure Functions Core Tools
-        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
-
-      - name: Azure Login
-        uses: azure/login@v2
-        with:
-          creds: ${{ secrets.AZURE_CREDENTIALS }}
-
-      - name: Publish Azure Function
-        run: |
-          func azure functionapp publish $(terraform -chdir=infra output -raw function_app_name)
-
-      - name: Logout from Azure
-        run: az logout
-
   apim-deploy:
-    needs: [infrastructure-deployment, azure-functions-deployment]
+    needs: infrastructure-deployment
     runs-on: ubuntu-latest
     environment: dev
     steps:
