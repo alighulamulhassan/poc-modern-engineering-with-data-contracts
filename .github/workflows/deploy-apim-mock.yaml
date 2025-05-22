@@ -33,7 +33,7 @@ jobs:
           for api_file in sample-apis/*.yaml; do
             api_name=$(basename "$api_file" .yaml)
             api_path="$api_name"
-            openapi_content=$(python3 -c "import sys, yaml, json; def default(o): return str(o); print(json.dumps(yaml.safe_load(sys.stdin), default=default))" < "$api_file")
+            openapi_content=$(python3 -c "import sys, yaml, json; print(json.dumps(yaml.safe_load(sys.stdin), default=str))" < "$api_file")
             echo "Importing $api_file as $api_name to APIM via REST API..."
             curl -X POST \
               -H "Authorization: Bearer $AZURE_TOKEN" \
