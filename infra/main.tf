@@ -4,10 +4,6 @@ provider "azurerm" {
   features {}
 }
 
-variable "resource_group_name" {}
-variable "location" {}
-variable "apim_name" {}
-
 resource "azurerm_storage_account" "function" {
   name                     = "mhrafuncstorage${random_id.suffix.hex}"
   resource_group_name      = var.resource_group_name
@@ -41,9 +37,7 @@ resource "azurerm_function_app" "mhra" {
   version                    = "~4"
   os_type                    = "linux"
   site_config {
-    application_stack {
-      node_version = "18-lts"
-    }
+    linux_fx_version = "Node|18-lts"
   }
   identity {
     type = "SystemAssigned"
