@@ -7,7 +7,7 @@ on:
     paths:
       - 'infra/**'
       - 'sample-apis/*.yaml'
-      - '.github/workflows/deploy-apim-mock.yaml'
+      - '.github/workflows/infra-apim-deploy.yaml'
     branches:
       - main
 
