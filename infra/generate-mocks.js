@@ -8,6 +8,7 @@ const path = require('path');
 const yaml = require('js-yaml');
 const https = require('https');
 const { promisify } = require('util');
+const os = require('os');
 
 const apisDir = path.join(__dirname, '../sample-apis');
 const AZURE_APIM_RESOURCE_GROUP = process.env.AZURE_APIM_RESOURCE_GROUP;
@@ -36,108 +37,64 @@ async function getAzureToken() {
 
 async function generateMockResponse(apiSpec, path, method, operationId) {
   try {
-    // Get the operation from the spec
-    const specContent = fs.readFileSync(apiSpec, 'utf8');
-    let spec;
+    // Create a temporary directory for Prism server
+    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prism-'));
+    const prismPort = 4010;
+    
+    // Start Prism server in the background
+    const prismProcess = execSync(
+      `npx @stoplight/prism-cli mock -p ${prismPort} "${apiSpec}"`,
+      { 
+        stdio: ['ignore', 'pipe', 'pipe'],
+        detached: true
+      }
+    );
+
+    // Wait for Prism to start
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
     try {
-      spec = yaml.load(specContent);
-    } catch (yamlError) {
-      throw new Error(`Failed to parse YAML from ${apiSpec}: ${yamlError.message}`);
-    }
-
-    const operation = spec.paths[path]?.[method.toLowerCase()];
-    if (!operation) {
-      throw new Error(`Operation not found: ${method} ${path}`);
-    }
-    
-    // Patient API mock responses
-    if (operationId === 'listPatients') {
-      return {
-        resourceType: "Bundle",
-        type: "searchset",
-        total: 2,
-        entry: [
-          {
-            resource: {
-              resourceType: "Patient",
-              id: "12345",
-              name: [{ family: "Smith", given: ["John"] }],
-              gender: "male",
-              birthDate: "1980-01-02"
+      // Make request to Prism server to get mock response
+      const response = await new Promise((resolve, reject) => {
+        const req = https.request({
+          hostname: 'localhost',
+          port: prismPort,
+          path: path,
+          method: method.toUpperCase(),
+          rejectUnauthorized: false
+        }, (res) => {
+          let data = '';
+          res.on('data', chunk => data += chunk);
+          res.on('end', () => {
+            try {
+              resolve(JSON.parse(data));
+            } catch (e) {
+              resolve(data);
             }
-          },
-          {
-            resource: {
-              resourceType: "Patient",
-              id: "67890",
-              name: [{ family: "Johnson", given: ["Sarah"] }],
-              gender: "female",
-              birthDate: "1992-03-15"
-            }
-          }
-        ]
-      };
-    }
-    
-    if (operationId === 'getPatientById') {
-      return {
-        resourceType: "Patient",
-        id: "12345",
-        name: [{ family: "Smith", given: ["John"] }],
-        gender: "male",
-        birthDate: "1980-01-02"
-      };
-    }
+          });
+        });
 
-    // Products API mock responses
-    if (operationId === 'listProducts') {
-      return [
-        {
-          id: "MED-123",
-          name: "Paracetamol 500mg",
-          category: "MEDICATION",
-          status: "AVAILABLE",
-          description: "Pain relief medication",
-          manufacturer: "PharmaCorp Ltd",
-          expiryDate: "2025-12-31"
-        },
-        {
-          id: "DEV-456",
-          name: "Digital Thermometer",
-          category: "DEVICE",
-          status: "AVAILABLE",
-          description: "Clinical grade thermometer",
-          manufacturer: "MedTech Inc",
-          expiryDate: "2026-06-30"
-        }
-      ];
-    }
+        req.on('error', (error) => {
+          reject(new Error(`Failed to get mock response: ${error.message}`));
+        });
 
-    if (operationId === 'getProductById') {
-      return {
-        id: "MED-123",
-        name: "Paracetamol 500mg",
-        category: "MEDICATION",
-        status: "AVAILABLE",
-        description: "Pain relief medication",
-        manufacturer: "PharmaCorp Ltd",
-        expiryDate: "2025-12-31"
-      };
-    }
+        req.end();
+      });
 
-    if (operationId === 'createProduct') {
-      return {
-        id: "MED-999",
-        name: "New Product",
-        category: "MEDICATION",
-        status: "AVAILABLE",
-        description: "Newly created product",
-        manufacturer: "Test Manufacturer",
-        expiryDate: "2026-12-31"
-      };
+      return response;
+    } finally {
+      // Clean up: Kill Prism server and remove temporary directory
+      try {
+        process.kill(-prismProcess.pid);
+      } catch (e) {
+        console.warn('Failed to kill Prism server:', e);
+      }
+      try {
+        fs.rmSync(tmpDir, { recursive: true });
+      } catch (e) {
+        console.warn('Failed to remove temporary directory:', e);
+      }
     }
-
-    throw new Error(`Unknown operation: ${operationId}`);
   } catch (error) {
     console.error(`Error generating mock for ${method} ${path}:`, error);
     throw error;
