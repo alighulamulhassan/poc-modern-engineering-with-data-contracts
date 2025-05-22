@@ -12,9 +12,12 @@ on:
       - main
 
 jobs:
-  infra-deploy:
+  infrastructure-deployment:
     runs-on: ubuntu-latest
     environment: dev
+    defaults:
+      run:
+        working-directory: infra
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -23,15 +26,59 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        working-directory: infra
-        run: terraform init
+        env:
+            TF_LOG: DEBUG
+        run: |
+            terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" \
+            -backend-config="container_name=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}" \
+            -backend-config="key=terraform.tfstate"
 
       - name: Terraform Apply
-        working-directory: infra
-        run: terraform apply -auto-approve
+        env:
+            TF_LOG: DEBUG
+        run: terraform apply \
+            -var="apim_name=${{ secrets.APIM_NAME }}" \
+            -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
+            -var="location=${{ secrets.AZURE_LOCATION }}"
+
+  azure-functions-deployment:
+    needs: infrastructure-deployment
+    runs-on: ubuntu-latest
+    environment: dev
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install dependencies
+        run: |
+          cd function
+          npm install
+          npm run build
+
+      - name: Install Azure Functions Core Tools
+        run: npm install -g azure-functions-core-tools@4 --unsafe-perm true
+
+      - name: Azure Login
+        uses: azure/login@v2
+        with:
+          creds: ${{ secrets.AZURE_CREDENTIALS }}
+
+      - name: Publish Azure Function
+        run: |
+          func azure functionapp publish $(terraform -chdir=infra output -raw function_app_name)
+
+      - name: Logout from Azure
+        run: az logout
 
   apim-deploy:
-    needs: infra-deploy
+    needs: [infrastructure-deployment, azure-functions-deployment]
     runs-on: ubuntu-latest
     environment: dev
     steps:
