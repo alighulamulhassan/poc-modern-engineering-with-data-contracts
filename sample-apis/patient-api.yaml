@@ -75,4 +75,4 @@ components:
         birthDate:
           type: string
           format: date
-          example: 1980-01-01
+          example: 1980-01-02
