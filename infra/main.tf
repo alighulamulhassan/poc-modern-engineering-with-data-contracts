@@ -4,6 +4,10 @@ provider "azurerm" {
   features {}
 }
 
+terraform {
+  backend "azurerm" {}
+}
+
 resource "azurerm_storage_account" "function" {
   name                     = "mhrafuncstorage${random_id.suffix.hex}"
   resource_group_name      = var.resource_group_name

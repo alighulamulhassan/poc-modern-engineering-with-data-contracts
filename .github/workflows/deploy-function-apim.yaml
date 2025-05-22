@@ -31,10 +31,22 @@ jobs:
         uses: hashicorp/setup-terraform@v3
 
       - name: Terraform Init
-        run: terraform init
+        env:
+            TF_LOG: DEBUG
+        run: |
+            terraform init \
+            -backend-config="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
+            -backend-config="storage_account_name=${{ secrets.AZURE_STORAGE_ACCOUNT_NAME }}" \
+            -backend-config="container_name=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}" \
+            -backend-config="terraform_state_key=terraform.tfstate"
 
       - name: Terraform Apply
-        run: terraform apply -auto-approve
+        env:
+            TF_LOG: DEBUG
+        run: terraform apply \
+            -var="apim_name=${{ secrets.APIM_NAME }}" \
+            -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
+            -var="location=${{ secrets.AZURE_LOCATION }}"
 
   deploy-function:
     needs: terraform
