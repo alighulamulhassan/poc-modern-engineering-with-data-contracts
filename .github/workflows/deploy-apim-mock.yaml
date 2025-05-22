@@ -33,13 +33,13 @@ jobs:
           for api_file in sample-apis/*.yaml; do
             api_name=$(basename "$api_file" .yaml)
             api_path="$api_name"
-            openapi_content=$(python3 -c "import json,sys; print(json.dumps(sys.stdin.read()))" < "$api_file")
+            openapi_content=$(python3 -c "import json,sys; print(json.dumps(open('$api_file').read()))")
             echo "Importing $api_file as $api_name to APIM via REST API..."
             curl -X POST \
               -H "Authorization: Bearer $AZURE_TOKEN" \
               -H "Content-Type: application/json" \
               "https://management.azure.com/subscriptions/$AZURE_SUBSCRIPTION_ID/resourceGroups/$AZURE_APIM_RESOURCE_GROUP/providers/Microsoft.ApiManagement/service/$AZURE_APIM_SERVICE_NAME/importOpenApi?api-version=2024-05-01" \
-              -d "{\"properties\":{\"format\":\"openapi\",\"value\":$openapi_content,\"path\":\"$api_path\"}}"
+              -d "{\"properties\":{\"format\":\"openapi+yaml\",\"value\":$openapi_content,\"path\":\"$api_path\"}}"
             echo "Waiting for API to be available..."
             sleep 20
             for op in listPatients getPatientById; do
