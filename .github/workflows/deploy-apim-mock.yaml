@@ -23,6 +23,12 @@ jobs:
         with:
           creds: ${{ secrets.AZURE_CREDENTIALS }}
 
+      - name: Update Azure CLI and APIM extension
+        run: |
+          az upgrade --yes
+          az extension add --name apim --upgrade --yes || az extension update --name apim
+        shell: bash
+
       - name: Deploy OpenAPI spec to APIM and enable mocking
         run: |
           for api_file in sample-apis/*.yaml; do
