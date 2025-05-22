@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-// patch-apim-mocks.js
+// generate-mocks.js
 // For each OpenAPI spec, for each operation, generate a mock response with Prism and PATCH the APIM operation policy.
 
 const { execSync, spawn } = require('child_process');
