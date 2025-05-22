@@ -24,11 +24,11 @@ locals {
 # Create version sets for APIs that have versions
 resource "azurerm_api_management_api_version_set" "version_sets" {
   for_each = {
-    for file, spec in local.api_specs : file => spec
+    for file, spec in local.api_specs : replace(lower(spec.info.title), " ", "-") => spec
     if spec.info.version != null
   }
 
-  name                = "${replace(lower(each.value.info.title), " ", "-")}-versions"
+  name                = "${each.key}-versions"
   resource_group_name = var.resource_group_name
   api_management_name = var.apim_name
   display_name        = "${each.value.info.title} Versions"
@@ -49,7 +49,7 @@ resource "azurerm_api_management_api" "apis" {
   
   # Only set version and version_set_id if version exists in the spec
   version            = each.value.info.version
-  version_set_id     = each.value.info.version != null ? azurerm_api_management_api_version_set.version_sets["${each.key}"].id : null
+  version_set_id     = each.value.info.version != null ? azurerm_api_management_api_version_set.version_sets[replace(lower(each.value.info.title), " ", "-")].id : null
   
   import {
     content_format = "openapi"
