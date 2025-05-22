@@ -20,22 +20,19 @@ resource "random_id" "suffix" {
   byte_length = 4
 }
 
-resource "azurerm_app_service_plan" "function" {
+resource "azurerm_service_plan" "function" {
   name                = "mhra-function-plan"
   location            = var.location
   resource_group_name = var.resource_group_name
-  kind                = "FunctionApp"
-  sku {
-    tier = "Dynamic"
-    size = "Y1"
-  }
+  os_type             = "Linux"
+  sku_name            = "Y1"
 }
 
 resource "azurerm_function_app" "mhra" {
   name                       = "mhra-function-app-${random_id.suffix.hex}"
   location                   = var.location
   resource_group_name        = var.resource_group_name
-  app_service_plan_id        = azurerm_app_service_plan.function.id
+  app_service_plan_id        = azurerm_service_plan.function.id
   storage_account_name       = azurerm_storage_account.function.name
   storage_account_access_key = azurerm_storage_account.function.primary_access_key
   version                    = "~4"
