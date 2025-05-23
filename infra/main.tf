@@ -2,24 +2,7 @@
 
 provider "azurerm" {
   features {}
-  subscription_id = var.subscription_id
-  tenant_id       = var.tenant_id
-
-  # Support both OIDC and service principal auth
-  dynamic "oidc" {
-    for_each = var.use_oidc ? [1] : []
-    content {
-      use_oidc = true
-    }
-  }
-
-  dynamic "client" {
-    for_each = var.use_oidc ? [] : [1]
-    content {
-      client_id     = var.client_id
-      client_secret = var.client_secret
-    }
-  }
+  # Authentication will be provided via ARM_* environment variables
 }
 
 terraform {
