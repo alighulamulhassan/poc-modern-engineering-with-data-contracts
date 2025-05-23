@@ -84,6 +84,20 @@ locals {
           method = upper(method)
           url_template = path
           description = try(operation.description, operation.summary)
+          request = try(operation.requestBody.content["application/json"].schema != null ? {
+            representation_type = "application/json"
+            schema = jsonencode(operation.requestBody.content["application/json"].schema)
+          } : null, null)
+          responses = try([
+            for status, response in operation.responses : {
+              status_code = tonumber(status)
+              representation = try(response.content["application/json"] != null ? {
+                content_type = "application/json"
+                schema = jsonencode(response.content["application/json"].schema)
+                example = try(response.content["application/json"].example, null)
+              } : null, null)
+            }
+          ], [])
         } if operation.operationId != null
       ]
     ]
@@ -108,10 +122,35 @@ resource "azurerm_api_management_api_operation" "operations" {
   url_template      = each.value.url_template
   description       = each.value.description
 
+  dynamic "request" {
+    for_each = each.value.request != null ? [each.value.request] : []
+    content {
+      representation {
+        content_type = request.value.representation_type
+        schema_id = "default"
+        type_name = "default"
+      }
+    }
+  }
+
+  dynamic "response" {
+    for_each = each.value.responses
+    content {
+      status_code = response.value.status_code
+      dynamic "representation" {
+        for_each = response.value.representation != null ? [response.value.representation] : []
+        content {
+          content_type = representation.value.content_type
+          schema_id = "default"
+          type_name = "default"
+        }
+      }
+    }
+  }
+
   lifecycle {
     ignore_changes = [
-      template_parameter,
-      response
+      template_parameter
     ]
   }
 }
