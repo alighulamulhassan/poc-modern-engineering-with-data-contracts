@@ -12,6 +12,44 @@ const AZURE_APIM_RESOURCE_GROUP = process.env.AZURE_APIM_RESOURCE_GROUP;
 const AZURE_APIM_SERVICE_NAME = process.env.AZURE_APIM_SERVICE_NAME;
 const AZURE_SUBSCRIPTION_ID = process.env.AZURE_SUBSCRIPTION_ID;
 
+// Add this at the top of the file after the imports
+let currentPrismProcess = null;
+let isPortInUse = false;
+let prismServer = null;
+
+function killPrismProcess() {
+  if (currentPrismProcess) {
+    try {
+      currentPrismProcess.kill('SIGTERM');
+      currentPrismProcess = null;
+      isPortInUse = false;
+    } catch (error) {
+      console.error('Error killing Prism process:', error);
+    }
+  }
+}
+
+// Helper function to check if port is in use
+function checkPortInUse(port) {
+  try {
+    execSync(`lsof -i:${port}`);
+    return true;
+  } catch (error) {
+    return false;
+  }
+}
+
+// Helper function to wait for port to be free
+async function waitForPortToBeFree(port, maxAttempts = 10) {
+  for (let i = 0; i < maxAttempts; i++) {
+    if (!checkPortInUse(port)) {
+      return true;
+    }
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+  return false;
+}
+
 // Validate required environment variables and tools
 function validateEnvironment() {
   const requiredVars = ['AZURE_APIM_RESOURCE_GROUP', 'AZURE_APIM_SERVICE_NAME', 'AZURE_SUBSCRIPTION_ID'];
@@ -40,71 +78,91 @@ async function getAzureToken() {
   }
 }
 
-// Use Prism to generate dynamic mock responses
-async function generateMockWithPrism(apiSpec, method, pathTemplate) {
+async function startPrismServer(apiSpec) {
+  // Kill any existing Prism process
+  if (prismServer) {
+    try {
+      prismServer.kill('SIGTERM');
+    } catch (error) {
+      console.error('Error killing existing Prism process:', error);
+    }
+  }
+
   return new Promise((resolve, reject) => {
-    console.log(`Generating mock for ${method.toUpperCase()} ${pathTemplate}`);
-    
-    // Start Prism server with dynamic response generation
-    const prismProcess = spawn('prism', ['mock', '-d', apiSpec, '--errors']);
+    console.log(`Starting Prism server for ${apiSpec}`);
+    prismServer = spawn('prism', ['mock', '-d', apiSpec, '--errors']);
     let serverStarted = false;
     let errorOutput = '';
 
-    prismProcess.stdout.on('data', async (data) => {
+    prismServer.stdout.on('data', (data) => {
       const output = data.toString();
       console.log(`Prism output: ${output}`);
-      if (output.includes('Server is listening') && !serverStarted) {
+      if (output.includes('Prism is listening') && !serverStarted) {
         serverStarted = true;
-        try {
-          // Add a small delay to ensure server is ready
-          await new Promise(resolve => setTimeout(resolve, 1000));
-          
-          // Make request to Prism server with appropriate headers
-          const response = execSync(
-            `curl -X ${method.toUpperCase()} http://localhost:4010${pathTemplate} \
-            -H "Accept: application/json" \
-            -H "Content-Type: application/json"`,
-            { encoding: 'utf8' }
-          );
-          
-          // Kill Prism server
-          prismProcess.kill();
-          
-          try {
-            resolve(JSON.parse(response));
-          } catch (parseError) {
-            resolve(response); // Return raw response if not JSON
-          }
-        } catch (error) {
-          prismProcess.kill();
-          reject(new Error(`Failed to get mock response: ${error.message}\n${errorOutput}`));
-        }
+        // Add a small delay to ensure server is fully ready
+        setTimeout(() => resolve(), 1000);
       }
     });
 
-    prismProcess.stderr.on('data', (data) => {
+    prismServer.stderr.on('data', (data) => {
       errorOutput += data.toString();
       console.error(`Prism error: ${data}`);
     });
 
-    // Handle server startup timeout
-    setTimeout(() => {
-      if (!serverStarted) {
-        prismProcess.kill();
-        reject(new Error(`Prism server startup timeout\n${errorOutput}`));
-      }
-    }, 10000); // Increased timeout to 10 seconds
-
-    prismProcess.on('error', (error) => {
+    prismServer.on('error', (error) => {
       reject(new Error(`Failed to start Prism: ${error.message}`));
     });
 
-    prismProcess.on('exit', (code, signal) => {
-      if (code !== null && code !== 0 && !serverStarted) {
-        reject(new Error(`Prism exited with code ${code}\n${errorOutput}`));
+    // Set a timeout for server startup
+    setTimeout(() => {
+      if (!serverStarted) {
+        reject(new Error(`Prism server startup timeout\n${errorOutput}`));
       }
-    });
+    }, 10000);
   });
+}
+
+async function getMockResponse(method, pathTemplate) {
+  try {
+    const response = await new Promise((resolve, reject) => {
+      const curlProcess = spawn('curl', [
+        '-X',
+        method.toUpperCase(),
+        `http://localhost:4010${pathTemplate}`,
+        '-H',
+        'Accept: application/json',
+        '-H',
+        'Content-Type: application/json'
+      ]);
+
+      let responseData = '';
+      let errorData = '';
+
+      curlProcess.stdout.on('data', (data) => {
+        responseData += data;
+      });
+
+      curlProcess.stderr.on('data', (data) => {
+        errorData += data;
+      });
+
+      curlProcess.on('close', (code) => {
+        if (code === 0 && responseData) {
+          try {
+            resolve(JSON.parse(responseData));
+          } catch (e) {
+            resolve(responseData); // Return raw response if not JSON
+          }
+        } else {
+          reject(new Error(`Failed to get mock response: ${errorData}`));
+        }
+      });
+    });
+
+    return response;
+  } catch (error) {
+    throw new Error(`Failed to get mock response: ${error.message}`);
+  }
 }
 
 async function setNamedValue(name, value, token) {
@@ -170,10 +228,62 @@ async function patchApiPolicy(apiName, operationId, token) {
   }
 }
 
+async function processOperation(apiName, pathTemplate, method, operation, token) {
+  if (!operation.operationId) return;
+
+  console.log(`Processing operation: ${method.toUpperCase()} ${pathTemplate} (${operation.operationId})`);
+  try {
+    // Get mock response from running Prism server
+    const mockResponse = await getMockResponse(method, pathTemplate);
+    console.log('Generated mock response:', JSON.stringify(mockResponse, null, 2));
+    
+    // Set named value for the mock response
+    const namedValueKey = `${apiName}-${operation.operationId}-mock`;
+    await setNamedValue(namedValueKey, JSON.stringify(mockResponse), token);
+    
+    // Update operation policy
+    await patchApiPolicy(apiName, operation.operationId, token);
+  } catch (error) {
+    console.error(`Failed to process operation ${operation.operationId}:`, error);
+  }
+}
+
+async function processApiSpec(apiSpecFile, token) {
+  console.log(`Processing API spec: ${apiSpecFile}`);
+  const apiSpec = path.join(apisDir, apiSpecFile);
+  const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
+  const apiName = apiSpecFile.replace('.yaml', '');
+
+  try {
+    // Start Prism server for this API spec
+    await startPrismServer(apiSpec);
+
+    // Flatten the operations into a single array
+    const operations = [];
+    for (const [pathTemplate, methods] of Object.entries(spec.paths)) {
+      for (const [method, operation] of Object.entries(methods)) {
+        if (operation.operationId) {
+          operations.push({ pathTemplate, method, operation });
+        }
+      }
+    }
+
+    // Process operations sequentially
+    for (const op of operations) {
+      await processOperation(apiName, op.pathTemplate, op.method, op.operation, token);
+    }
+  } finally {
+    // Cleanup Prism server after processing all operations for this spec
+    if (prismServer) {
+      prismServer.kill('SIGTERM');
+      prismServer = null;
+    }
+  }
+}
+
 async function main() {
   try {
     validateEnvironment();
-    
     const token = await getAzureToken();
 
     // Check if Prism is installed
@@ -184,42 +294,21 @@ async function main() {
       execSync('npm install -g @stoplight/prism-cli');
     }
 
-    // Process each API spec
+    // Process each API spec sequentially
     const apiSpecFiles = fs.readdirSync(apisDir).filter(file => file.endsWith('.yaml'));
-    
     for (const apiSpecFile of apiSpecFiles) {
-      console.log(`Processing API spec: ${apiSpecFile}`);
-      const apiSpec = path.join(apisDir, apiSpecFile);
-      const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
-      const apiName = apiSpecFile.replace('.yaml', '');
-
-      for (const [pathTemplate, methods] of Object.entries(spec.paths)) {
-        for (const [method, operation] of Object.entries(methods)) {
-          if (!operation.operationId) continue;
-
-          console.log(`Generating mock for ${method.toUpperCase()} ${pathTemplate} (${operation.operationId})`);
-          try {
-            // Generate mock response using Prism
-            const mockResponse = await generateMockWithPrism(apiSpec, method, pathTemplate);
-            console.log('Generated mock response:', JSON.stringify(mockResponse, null, 2));
-            
-            // Set named value for the mock response
-            const namedValueKey = `${apiName}-${operation.operationId}-mock`;
-            await setNamedValue(namedValueKey, JSON.stringify(mockResponse), token);
-            
-            // Update operation policy
-            await patchApiPolicy(apiName, operation.operationId, token);
-          } catch (error) {
-            console.error(`Failed to process operation ${operation.operationId}:`, error);
-          }
-        }
-      }
+      await processApiSpec(apiSpecFile, token);
     }
 
     console.log('Successfully generated and uploaded all mock responses and policies');
   } catch (error) {
     console.error('Failed to generate mocks:', error);
     process.exit(1);
+  } finally {
+    // Ensure Prism server is cleaned up
+    if (prismServer) {
+      prismServer.kill('SIGTERM');
+    }
   }
 }
 
