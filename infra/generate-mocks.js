@@ -297,6 +297,29 @@ async function validateAzureAccess(token) {
   }
 }
 
+async function validateApiExists(apiName, token) {
+  console.log(`\nValidating API ${apiName} exists in APIM...`);
+  const url = `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_APIM_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${AZURE_APIM_SERVICE_NAME}/apis/${apiName}?api-version=2021-08-01`;
+  
+  try {
+    const result = execSync(`curl -s -X GET "${url}" \
+      -H "Authorization: Bearer ${token}" \
+      -H "Content-Type: application/json"`, 
+      { encoding: 'utf8' }
+    );
+    
+    const parsedResult = JSON.parse(result);
+    if (parsedResult.error) {
+      throw new Error(`API error: ${JSON.stringify(parsedResult.error)}`);
+    }
+    console.log(`Successfully validated API ${apiName} exists in APIM`);
+    return true;
+  } catch (error) {
+    console.error(`API ${apiName} not found in APIM:`, error);
+    return false;
+  }
+}
+
 async function processOperation(apiName, pathTemplate, method, operation, token) {
   if (!operation.operationId) return;
 
@@ -321,7 +344,17 @@ async function processApiSpec(apiSpecFile, token) {
   console.log(`Processing API spec: ${apiSpecFile}`);
   const apiSpec = path.join(apisDir, apiSpecFile);
   const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
-  const apiName = apiSpecFile.replace('.yaml', '');
+  
+  // Get API name from spec title, convert to lowercase and replace spaces with hyphens
+  const apiName = spec.info.title.toLowerCase().replace(/\s+/g, '-').replace(/[^a-z0-9-]/g, '');
+  console.log(`Using API name: ${apiName}`);
+
+  // Validate API exists before proceeding
+  const apiExists = await validateApiExists(apiName, token);
+  if (!apiExists) {
+    console.error(`Skipping API ${apiName} as it does not exist in APIM`);
+    return;
+  }
 
   try {
     // Start Prism server for this API spec
