@@ -66,7 +66,6 @@ resource "azurerm_api_management_api" "apis" {
     ignore_changes = [
       # Ignore changes to operations as policies are managed by generate-mocks.js
       path,
-      soap_pass_through,
       subscription_required,
       service_url
     ]
