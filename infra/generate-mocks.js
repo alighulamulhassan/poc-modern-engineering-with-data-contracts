@@ -169,28 +169,49 @@ async function setNamedValue(name, value, token) {
   const url = `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_APIM_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${AZURE_APIM_SERVICE_NAME}/namedValues/${name}?api-version=2021-08-01`;
 
   try {
+    console.log(`Setting named value: ${name}`);
+    console.log(`APIM Service: ${AZURE_APIM_SERVICE_NAME}`);
+    console.log(`Resource Group: ${AZURE_APIM_RESOURCE_GROUP}`);
+    
+    // Ensure value is a properly escaped JSON string
+    const jsonValue = typeof value === 'string' ? value : JSON.stringify(value);
+    
     const body = {
       properties: {
         displayName: name,
-        value: value,
+        value: jsonValue,
         secret: false
       }
     };
 
     const escapedBody = JSON.stringify(body).replace(/'/g, "'\\''");
+    console.log(`Setting named value URL: ${url}`);
+    console.log(`Request body: ${escapedBody}`);
 
-    const result = execSync(`curl -s -X PUT "${url}" \
+    const curlCmd = `curl -v -X PUT "${url}" \
       -H "Authorization: Bearer ${token}" \
       -H "Content-Type: application/json" \
       -H "Accept: application/json" \
-      -d '${escapedBody}'`, {
-      encoding: 'utf8'
-    });
+      -d '${escapedBody}'`;
+    
+    console.log('Executing curl command for named value...');
+    const result = execSync(curlCmd, { encoding: 'utf8', stdio: 'pipe' });
+    console.log(`Named value response: ${result}`);
+
+    try {
+      const parsedResult = JSON.parse(result);
+      if (parsedResult.error) {
+        throw new Error(`API error: ${JSON.stringify(parsedResult.error)}`);
+      }
+    } catch (parseError) {
+      console.log('Could not parse response as JSON, but command did not fail');
+    }
 
     console.log(`Successfully set named value ${name}`);
     return result;
   } catch (error) {
     console.error(`Error setting named value ${name}:`, error);
+    console.error('Error details:', error.stdout?.toString(), error.stderr?.toString());
     throw error;
   }
 }
@@ -199,9 +220,21 @@ async function patchApiPolicy(apiName, operationId, token) {
   const url = `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_APIM_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${AZURE_APIM_SERVICE_NAME}/apis/${apiName}/operations/${operationId}/policies/policy?api-version=2021-08-01`;
 
   try {
-    const policyXml = fs.readFileSync(path.join(__dirname, 'templates/mock-policy.xml'), 'utf8')
+    console.log(`\nUpdating policy for API: ${apiName}, Operation: ${operationId}`);
+    console.log(`APIM URL: ${url}`);
+
+    // Read and validate policy template exists
+    const policyTemplatePath = path.join(__dirname, 'templates/mock-policy.xml');
+    if (!fs.existsSync(policyTemplatePath)) {
+      throw new Error(`Policy template not found at ${policyTemplatePath}`);
+    }
+
+    const policyXml = fs.readFileSync(policyTemplatePath, 'utf8')
       .replace('${api_name}', apiName)
       .replace('${operation_id}', operationId);
+
+    console.log('Policy XML to be applied:');
+    console.log(policyXml);
 
     const body = {
       properties: {
@@ -211,19 +244,55 @@ async function patchApiPolicy(apiName, operationId, token) {
     };
 
     const escapedBody = JSON.stringify(body).replace(/'/g, "'\\''");
+    console.log(`Patching: API: ${apiName} OP: ${operationId}`);
+    console.log(`Request body: ${escapedBody}`);
 
-    const result = execSync(`curl -s -X PUT "${url}" \
+    const curlCmd = `curl -v -X PUT "${url}" \
       -H "Authorization: Bearer ${token}" \
       -H "Content-Type: application/json" \
       -H "Accept: application/json" \
-      -d '${escapedBody}'`, {
-      encoding: 'utf8'
-    });
+      -d '${escapedBody}'`;
+
+    console.log('Executing curl command for policy update...');
+    const result = execSync(curlCmd, { encoding: 'utf8', stdio: 'pipe' });
+    console.log(`Policy update response: ${result}`);
+
+    try {
+      const parsedResult = JSON.parse(result);
+      if (parsedResult.error) {
+        throw new Error(`API error: ${JSON.stringify(parsedResult.error)}`);
+      }
+    } catch (parseError) {
+      console.log('Could not parse response as JSON, but command did not fail');
+    }
 
     console.log(`Successfully updated policy for operation ${operationId}`);
     return result;
   } catch (error) {
     console.error(`Error updating policy for operation ${operationId}:`, error);
+    console.error('Error details:', error.stdout?.toString(), error.stderr?.toString());
+    throw error;
+  }
+}
+
+async function validateAzureAccess(token) {
+  console.log('\nValidating Azure API Management access...');
+  const testUrl = `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_APIM_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${AZURE_APIM_SERVICE_NAME}?api-version=2021-08-01`;
+  
+  try {
+    const result = execSync(`curl -s -X GET "${testUrl}" \
+      -H "Authorization: Bearer ${token}" \
+      -H "Content-Type: application/json"`, 
+      { encoding: 'utf8' }
+    );
+    
+    const parsedResult = JSON.parse(result);
+    if (parsedResult.error) {
+      throw new Error(`API error: ${JSON.stringify(parsedResult.error)}`);
+    }
+    console.log('Successfully validated Azure API Management access');
+  } catch (error) {
+    console.error('Failed to validate Azure API Management access:', error);
     throw error;
   }
 }
@@ -285,6 +354,9 @@ async function main() {
   try {
     validateEnvironment();
     const token = await getAzureToken();
+    
+    // Validate Azure access before proceeding
+    await validateAzureAccess(token);
 
     // Check if Prism is installed
     try {
@@ -305,7 +377,6 @@ async function main() {
     console.error('Failed to generate mocks:', error);
     process.exit(1);
   } finally {
-    // Ensure Prism server is cleaned up
     if (prismServer) {
       prismServer.kill('SIGTERM');
     }
