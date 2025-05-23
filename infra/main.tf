@@ -2,13 +2,32 @@
 
 provider "azurerm" {
   features {}
+  subscription_id = var.subscription_id
+  tenant_id       = var.tenant_id
+
+  # Support both OIDC and service principal auth
+  dynamic "oidc" {
+    for_each = var.use_oidc ? [1] : []
+    content {
+      use_oidc = true
+    }
+  }
+
+  dynamic "client" {
+    for_each = var.use_oidc ? [] : [1]
+    content {
+      client_id     = var.client_id
+      client_secret = var.client_secret
+    }
+  }
 }
 
 terraform {
   backend "azurerm" {}
   required_providers {
     azurerm = {
-      source = "hashicorp/azurerm"
+      source  = "hashicorp/azurerm"
+      version = "~> 4.0"
     }
   }
 }
@@ -19,42 +38,6 @@ locals {
   api_specs = {
     for file in local.api_files : basename(file) => yamldecode(file(file))
   }
-
-  list_patients_policy = <<XML
-<policies>
-    <inbound>
-        <base />
-        <return-response>
-            <set-status code="200" reason="OK" />
-            <set-header name="Content-Type" exists-action="override">
-                <value>application/fhir+json</value>
-            </set-header>
-            <set-body>{"resourceType":"Bundle","type":"searchset","total":2,"entry":[{"resource":{"resourceType":"Patient","id":"12345","name":[{"family":"Smith","given":["John"]}],"gender":"male","birthDate":"1980-01-02"}},{"resource":{"resourceType":"Patient","id":"67890","name":[{"family":"Johnson","given":["Sarah"]}],"gender":"female","birthDate":"1992-03-15"}}]}</set-body>
-        </return-response>
-    </inbound>
-    <backend><base /></backend>
-    <outbound><base /></outbound>
-    <on-error><base /></on-error>
-</policies>
-XML
-
-  get_patient_policy = <<XML
-<policies>
-    <inbound>
-        <base />
-        <return-response>
-            <set-status code="200" reason="OK" />
-            <set-header name="Content-Type" exists-action="override">
-                <value>application/fhir+json</value>
-            </set-header>
-            <set-body>{"resourceType":"Patient","id":"12345","name":[{"family":"Smith","given":["John"]}],"gender":"male","birthDate":"1980-01-02"}</set-body>
-        </return-response>
-    </inbound>
-    <backend><base /></backend>
-    <outbound><base /></outbound>
-    <on-error><base /></on-error>
-</policies>
-XML
 }
 
 # Create or maintain version sets for APIs that have versions
@@ -94,6 +77,16 @@ resource "azurerm_api_management_api" "apis" {
   import {
     content_format = "openapi"
     content_value  = file("${path.module}/../sample-apis/${each.key}")
+  }
+
+  lifecycle {
+    ignore_changes = [
+      # Ignore changes to operations as policies are managed by generate-mocks.js
+      path,
+      soap_pass_through,
+      subscription_required,
+      service_url
+    ]
   }
 }
 
@@ -141,41 +134,15 @@ resource "azurerm_api_management_api_operation" "operations" {
   }
 }
 
-# Apply mock policies to individual operations
-resource "azurerm_api_management_api_operation_policy" "mock_policies" {
+# Apply basic policies to individual operations
+resource "azurerm_api_management_api_operation_policy" "basic_policies" {
   for_each = local.operation_policies
-  
+
   api_name            = each.value.api_name
   api_management_name = var.apim_name
   resource_group_name = var.resource_group_name
   operation_id        = each.value.operation_id
-  xml_content         = <<XML
-<?xml version="1.0" encoding="utf-8"?>
-<policies>
-    <inbound>
-        <base />
-        <return-response>
-            <set-status code="200" reason="OK" />
-            <set-header name="Content-Type" exists-action="override">
-                <value>application/fhir+json; charset=utf-8</value>
-            </set-header>
-            <set-body>${each.value.operation_id == "listPatients" ?
-              "{\"resourceType\":\"Bundle\",\"type\":\"searchset\",\"total\":2,\"entry\":[{\"resource\":{\"resourceType\":\"Patient\",\"id\":\"12345\",\"name\":[{\"family\":\"Smith\",\"given\":[\"John\"]}],\"gender\":\"male\",\"birthDate\":\"1980-01-02\"}},{\"resource\":{\"resourceType\":\"Patient\",\"id\":\"67890\",\"name\":[{\"family\":\"Johnson\",\"given\":[\"Sarah\"]}],\"gender\":\"female\",\"birthDate\":\"1992-03-15\"}}]}" :
-              "{\"resourceType\":\"Patient\",\"id\":\"12345\",\"name\":[{\"family\":\"Smith\",\"given\":[\"John\"]}],\"gender\":\"male\",\"birthDate\":\"1980-01-02\"}"
-            }</set-body>
-        </return-response>
-    </inbound>
-    <backend>
-        <base />
-    </backend>
-    <outbound>
-        <base />
-    </outbound>
-    <on-error>
-        <base />
-    </on-error>
-</policies>
-XML
+  xml_content = file("${path.module}/templates/basic-policy.xml")
 
   depends_on = [
     azurerm_api_management_api.apis,

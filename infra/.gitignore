@@ -10,6 +10,7 @@ override.tf.json
 *_override.tf
 *_override.tf.json
 .terraform.lock.hcl
+tfplan
 
 # But do NOT ignore the lock file for reproducibility
 !.terraform.lock.hcl

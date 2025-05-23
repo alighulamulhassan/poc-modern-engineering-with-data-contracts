@@ -22,6 +22,15 @@ export AZURE_APIM_SERVICE_NAME=$(az apim list -g $AZURE_APIM_RESOURCE_GROUP --qu
 export AZURE_STORAGE_ACCOUNT_NAME=$(az storage account list -g $AZURE_APIM_RESOURCE_GROUP --query '[0].name' -o tsv)
 export AZURE_STORAGE_CONTAINER_NAME="pocmhraapimmockcontainer"
 
+# Export Terraform variables
+export TF_VAR_subscription_id=$ARM_SUBSCRIPTION_ID
+export TF_VAR_tenant_id=$ARM_TENANT_ID
+export TF_VAR_client_id=$ARM_CLIENT_ID
+export TF_VAR_client_secret=$ARM_CLIENT_SECRET  # Note: This might be empty for OIDC auth
+export TF_VAR_resource_group_name=$AZURE_APIM_RESOURCE_GROUP
+export TF_VAR_apim_name=$AZURE_APIM_SERVICE_NAME
+export TF_VAR_location=$(az group show -n $AZURE_APIM_RESOURCE_GROUP --query location -o tsv)
+
 # Print the exported variables
 echo "Environment variables set:"
 echo "ARM_SUBSCRIPTION_ID: $ARM_SUBSCRIPTION_ID"
