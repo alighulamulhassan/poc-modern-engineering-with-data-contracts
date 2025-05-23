@@ -14,7 +14,7 @@ paths:
         '200':
           description: A list of patients
           content:
-            application/fhir+json:
+            application/json:
               schema:
                 type: object
                 properties:
@@ -39,7 +39,7 @@ paths:
         '200':
           description: Patient resource
           content:
-            application/fhir+json:
+            application/json:
               schema:
                 $ref: '#/components/schemas/Patient'
 components:
