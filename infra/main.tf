@@ -21,12 +21,17 @@ locals {
   api_specs = {
     for file in local.api_files : basename(file) => yamldecode(file(file))
   }
+
+  # Standardize API name derivation
+  api_names = {
+    for file, spec in local.api_specs : file => replace(replace(lower(basename(file)), ".yaml", ""), ".yml", "")
+  }
 }
 
 # Create or maintain version sets for APIs that have versions
 resource "azurerm_api_management_api_version_set" "version_sets" {
   for_each = {
-    for file, spec in local.api_specs : replace(lower(spec.info.title), " ", "-") => spec
+    for file, spec in local.api_specs : local.api_names[file] => spec
     if spec.info.version != null
   }
 
@@ -45,17 +50,17 @@ resource "azurerm_api_management_api_version_set" "version_sets" {
 resource "azurerm_api_management_api" "apis" {
   for_each = local.api_specs
 
-  name                = replace(lower(each.value.info.title), " ", "-")
+  name                = local.api_names[each.key]
   resource_group_name = var.resource_group_name
   api_management_name = var.apim_name
   revision            = "1"
   display_name        = each.value.info.title
-  path                = replace(lower(each.value.info.title), " ", "-")
+  path                = local.api_names[each.key]
   protocols           = ["https"]
   
   # Only set version and version_set_id if version exists in the spec
   version            = each.value.info.version
-  version_set_id     = each.value.info.version != null ? azurerm_api_management_api_version_set.version_sets[replace(lower(each.value.info.title), " ", "-")].id : null
+  version_set_id     = each.value.info.version != null ? azurerm_api_management_api_version_set.version_sets[local.api_names[each.key]].id : null
   
   import {
     content_format = "openapi"
@@ -74,23 +79,38 @@ resource "azurerm_api_management_api" "apis" {
 
 # Extract operations from OpenAPI specs
 locals {
+  # This block processes OpenAPI specifications to extract API operation details
+  # It flattens nested data from the specs into a list of operation objects
   api_operations = flatten([
+    # Iterate through each API specification file
     for file_name, spec in local.api_specs : [
+      # For each path in the spec
       for path, path_info in spec.paths : [
+        # For each HTTP method (GET, POST etc) in the path
         for method, operation in path_info : {
-          api_name = replace(lower(spec.info.title), " ", "-")
+          # Generate API name from title, converting to lowercase with hyphens
+          api_name = local.api_names[file_name]
+          # Extract operation ID which uniquely identifies the operation
           operation_id = operation.operationId
+          # Get operation summary for display name
           display_name = operation.summary
+          # Convert HTTP method to uppercase
           method = upper(method)
+          # Get the URL path template
           url_template = path
+          # Get description, falling back to summary if not present
           description = try(operation.description, operation.summary)
+          # Extract request schema if present
           request = try(operation.requestBody.content["application/json"].schema != null ? {
             representation_type = "application/json"
             schema = jsonencode(operation.requestBody.content["application/json"].schema)
           } : null, null)
+          # Extract response details for each status code
           responses = try([
             for status, response in operation.responses : {
+              # Convert status code string to number
               status_code = tonumber(status)
+              # Get response schema and example if present
               representation = try(response.content["application/json"] != null ? {
                 content_type = "application/json"
                 schema = jsonencode(response.content["application/json"].schema)
@@ -98,7 +118,7 @@ locals {
               } : null, null)
             }
           ], [])
-        } if operation.operationId != null
+        } if operation.operationId != null # Only include operations with an ID
       ]
     ]
   ])
