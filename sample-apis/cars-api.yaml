@@ -1,0 +1,271 @@
+openapi: 3.0.1
+info:
+  title: Cars API
+  description: Sample Cars API for testing mock responses
+  version: 1.0.0
+servers:
+  - url: https://api.example.com/v1
+paths:
+  /cars:
+    get:
+      summary: List all cars
+      operationId: listCars
+      parameters:
+        - name: make
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter cars by make
+        - name: model
+          in: query
+          required: false
+          schema:
+            type: string
+          description: Filter cars by model
+      responses:
+        '200':
+          description: A list of cars
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  items:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/Car'
+                  totalCount:
+                    type: integer
+                    example: 10
+    post:
+      summary: Create a new car
+      operationId: createCar
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CarCreate'
+      responses:
+        '201':
+          description: Car created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Car'
+  /cars/{id}:
+    get:
+      summary: Get a car by ID
+      operationId: getCarById
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Car details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Car'
+        '404':
+          description: Car not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    put:
+      summary: Update a car
+      operationId: updateCar
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CarUpdate'
+      responses:
+        '200':
+          description: Car updated successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Car'
+        '404':
+          description: Car not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+    delete:
+      summary: Delete a car
+      operationId: deleteCar
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '204':
+          description: Car deleted successfully
+        '404':
+          description: Car not found
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Error'
+components:
+  schemas:
+    Car:
+      type: object
+      required:
+        - id
+        - make
+        - model
+        - year
+      properties:
+        id:
+          type: string
+          example: "car-123"
+        make:
+          type: string
+          example: "Toyota"
+        model:
+          type: string
+          example: "Camry"
+        year:
+          type: integer
+          example: 2023
+        color:
+          type: string
+          example: "Silver"
+        price:
+          type: number
+          format: float
+          example: 25000.00
+        features:
+          type: array
+          items:
+            type: string
+          example: ["Bluetooth", "Navigation", "Sunroof"]
+        specifications:
+          type: object
+          properties:
+            engine:
+              type: string
+              example: "2.5L 4-cylinder"
+            transmission:
+              type: string
+              example: "Automatic"
+            fuelType:
+              type: string
+              example: "Gasoline"
+            mileage:
+              type: number
+              format: float
+              example: 30.5
+    CarCreate:
+      type: object
+      required:
+        - make
+        - model
+        - year
+      properties:
+        make:
+          type: string
+          example: "Toyota"
+        model:
+          type: string
+          example: "Camry"
+        year:
+          type: integer
+          example: 2023
+        color:
+          type: string
+          example: "Silver"
+        price:
+          type: number
+          format: float
+          example: 25000.00
+        features:
+          type: array
+          items:
+            type: string
+          example: ["Bluetooth", "Navigation", "Sunroof"]
+        specifications:
+          type: object
+          properties:
+            engine:
+              type: string
+              example: "2.5L 4-cylinder"
+            transmission:
+              type: string
+              example: "Automatic"
+            fuelType:
+              type: string
+              example: "Gasoline"
+            mileage:
+              type: number
+              format: float
+              example: 30.5
+    CarUpdate:
+      type: object
+      properties:
+        make:
+          type: string
+          example: "Toyota"
+        model:
+          type: string
+          example: "Camry"
+        year:
+          type: integer
+          example: 2023
+        color:
+          type: string
+          example: "Silver"
+        price:
+          type: number
+          format: float
+          example: 25000.00
+        features:
+          type: array
+          items:
+            type: string
+          example: ["Bluetooth", "Navigation", "Sunroof"]
+        specifications:
+          type: object
+          properties:
+            engine:
+              type: string
+              example: "2.5L 4-cylinder"
+            transmission:
+              type: string
+              example: "Automatic"
+            fuelType:
+              type: string
+              example: "Gasoline"
+            mileage:
+              type: number
+              format: float
+              example: 30.5
+    Error:
+      type: object
+      required:
+        - code
+        - message
+      properties:
+        code:
+          type: string
+          example: "NOT_FOUND"
+        message:
+          type: string
+          example: "Car not found" 
