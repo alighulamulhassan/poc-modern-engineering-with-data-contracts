@@ -7,10 +7,14 @@
     "node": ">=20.0.0"
   },
   "dependencies": {
-    "@stoplight/prism-cli": "^5.14.2",
     "js-yaml": "^4.1.0"
   },
   "scripts": {
-    "generate-mocks": "node generate-mocks.js"
+    "setup-infra": "terraform init && terraform apply -auto-approve",
+    "generate-mocks": "node generate-mocks.js",
+    "apply-mock-policies": "terraform init && terraform apply -var-file=terraform.tfvars -target=azurerm_api_management_api_operation_policy.mock_policies -auto-approve"
+  },
+  "devDependencies": {
+    "@stoplight/prism-cli": "^5.14.2"
   }
 }

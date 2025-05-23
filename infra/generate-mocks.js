@@ -2,13 +2,10 @@
 // generate-mocks.js
 // For each OpenAPI spec, generate mock responses for each operation and set them in APIM context variables
 
-const { execSync } = require('child_process');
+const { execSync, spawn } = require('child_process');
 const fs = require('fs');
 const path = require('path');
 const yaml = require('js-yaml');
-const https = require('https');
-const { promisify } = require('util');
-const os = require('os');
 
 const apisDir = path.join(__dirname, '../sample-apis');
 const AZURE_APIM_RESOURCE_GROUP = process.env.AZURE_APIM_RESOURCE_GROUP;
@@ -35,70 +32,50 @@ async function getAzureToken() {
   }
 }
 
-async function generateMockResponse(apiSpec, path, method, operationId) {
-  try {
-    // Create a temporary directory for Prism server
-    const tmpDir = fs.mkdtempSync(path.join(os.tmpdir(), 'prism-'));
-    const prismPort = 4010;
-    
-    // Start Prism server in the background
-    const prismProcess = execSync(
-      `npx @stoplight/prism-cli mock -p ${prismPort} "${apiSpec}"`,
-      { 
-        stdio: ['ignore', 'pipe', 'pipe'],
-        detached: true
-      }
-    );
+// Use Prism to generate dynamic mock responses
+async function generateMockWithPrism(apiSpec, method, pathTemplate) {
+  return new Promise((resolve, reject) => {
+    // Start Prism server with dynamic response generation
+    const prismProcess = spawn('prism', ['mock', '-d', apiSpec]);
+    let serverStarted = false;
 
-    // Wait for Prism to start
-    await new Promise(resolve => setTimeout(resolve, 2000));
-
-    try {
-      // Make request to Prism server to get mock response
-      const response = await new Promise((resolve, reject) => {
-        const req = https.request({
-          hostname: 'localhost',
-          port: prismPort,
-          path: path,
-          method: method.toUpperCase(),
-          rejectUnauthorized: false
-        }, (res) => {
-          let data = '';
-          res.on('data', chunk => data += chunk);
-          res.on('end', () => {
-            try {
-              resolve(JSON.parse(data));
-            } catch (e) {
-              resolve(data);
-            }
+    prismProcess.stdout.on('data', async (data) => {
+      const output = data.toString();
+      if (output.includes('Server is listening') && !serverStarted) {
+        serverStarted = true;
+        try {
+          // Make request to Prism server
+          const response = execSync(`curl -X ${method.toUpperCase()} http://localhost:4010${pathTemplate}`, {
+            encoding: 'utf8'
           });
-        });
 
-        req.on('error', (error) => {
-          reject(new Error(`Failed to get mock response: ${error.message}`));
-        });
-
-        req.end();
-      });
-
-      return response;
-    } finally {
-      // Clean up: Kill Prism server and remove temporary directory
-      try {
-        process.kill(-prismProcess.pid);
-      } catch (e) {
-        console.warn('Failed to kill Prism server:', e);
+          // Kill Prism server
+          prismProcess.kill();
+          
+          try {
+            resolve(JSON.parse(response));
+          } catch (parseError) {
+            resolve(response); // Return raw response if not JSON
+          }
+        } catch (error) {
+          prismProcess.kill();
+          reject(error);
+        }
       }
-      try {
-        fs.rmSync(tmpDir, { recursive: true });
-      } catch (e) {
-        console.warn('Failed to remove temporary directory:', e);
+    });
+
+    prismProcess.stderr.on('data', (data) => {
+      console.error(`Prism error: ${data}`);
+    });
+
+    // Handle server startup timeout
+    setTimeout(() => {
+      if (!serverStarted) {
+        prismProcess.kill();
+        reject(new Error('Prism server startup timeout'));
       }
-    }
-  } catch (error) {
-    console.error(`Error generating mock for ${method} ${path}:`, error);
-    throw error;
-  }
+    }, 5000);
+  });
 }
 
 async function setNamedValue(name, value, token) {
@@ -108,15 +85,14 @@ async function setNamedValue(name, value, token) {
     const body = {
       properties: {
         displayName: name,
-        value: value, // Value is already stringified by the caller
+        value: value,
         secret: false
       }
     };
 
-    // Escape single quotes in the JSON
     const escapedBody = JSON.stringify(body).replace(/'/g, "'\\''");
 
-    const result = execSync(`curl -X PUT "${url}" \
+    const result = execSync(`curl -s -X PUT "${url}" \
       -H "Authorization: Bearer ${token}" \
       -H "Content-Type: application/json" \
       -H "Accept: application/json" \
@@ -132,42 +108,86 @@ async function setNamedValue(name, value, token) {
   }
 }
 
+async function patchApiPolicy(apiName, operationId, token) {
+  const url = `https://management.azure.com/subscriptions/${AZURE_SUBSCRIPTION_ID}/resourceGroups/${AZURE_APIM_RESOURCE_GROUP}/providers/Microsoft.ApiManagement/service/${AZURE_APIM_SERVICE_NAME}/apis/${apiName}/operations/${operationId}/policies/policy?api-version=2021-08-01`;
+
+  try {
+    const policyXml = fs.readFileSync(path.join(__dirname, 'templates/mock-policy.xml'), 'utf8')
+      .replace('${api_name}', apiName)
+      .replace('${operation_id}', operationId);
+
+    const body = {
+      properties: {
+        format: 'xml',
+        value: policyXml
+      }
+    };
+
+    const escapedBody = JSON.stringify(body).replace(/'/g, "'\\''");
+
+    const result = execSync(`curl -s -X PUT "${url}" \
+      -H "Authorization: Bearer ${token}" \
+      -H "Content-Type: application/json" \
+      -H "Accept: application/json" \
+      -d '${escapedBody}'`, {
+      encoding: 'utf8'
+    });
+
+    console.log(`Successfully updated policy for operation ${operationId}`);
+    return result;
+  } catch (error) {
+    console.error(`Error updating policy for operation ${operationId}:`, error);
+    throw error;
+  }
+}
+
 async function main() {
   try {
     validateEnvironment();
     
     const token = await getAzureToken();
-    const files = fs.readdirSync(apisDir).filter(file => file.endsWith('.yaml'));
 
-    for (const file of files) {
-      const apiSpec = path.join(apisDir, file);
-      console.log(`Processing API spec: ${file}`);
+    // Check if Prism is installed
+    try {
+      execSync('prism --version');
+    } catch (error) {
+      console.error('Prism CLI is not installed. Installing...');
+      execSync('npm install -g @stoplight/prism-cli');
+    }
 
+    // Process each API spec
+    const apiSpecFiles = fs.readdirSync(apisDir).filter(file => file.endsWith('.yaml'));
+    
+    for (const apiSpecFile of apiSpecFiles) {
+      console.log(`Processing API spec: ${apiSpecFile}`);
+      const apiSpec = path.join(apisDir, apiSpecFile);
       const spec = yaml.load(fs.readFileSync(apiSpec, 'utf8'));
-      
-      for (const [path, pathObj] of Object.entries(spec.paths)) {
-        for (const [method, operation] of Object.entries(pathObj)) {
-          const operationId = operation.operationId;
-          if (!operationId) {
-            console.warn(`Warning: Missing operationId for ${method} ${path}`);
-            continue;
-          }
+      const apiName = apiSpecFile.replace('.yaml', '');
 
+      for (const [pathTemplate, methods] of Object.entries(spec.paths)) {
+        for (const [method, operation] of Object.entries(methods)) {
+          if (!operation.operationId) continue;
+
+          console.log(`Generating mock for ${method.toUpperCase()} ${pathTemplate} (${operation.operationId})`);
           try {
-            const mockResponse = await generateMockResponse(apiSpec, path, method, operationId);
-            const mockResponseStr = JSON.stringify(mockResponse);
-            const namedValueKey = `mock-${operationId}`;
+            // Generate mock response using Prism
+            const mockResponse = await generateMockWithPrism(apiSpec, method, pathTemplate);
+            console.log('Generated mock response:', JSON.stringify(mockResponse, null, 2));
             
-            await setNamedValue(namedValueKey, mockResponseStr, token);
+            // Set named value for the mock response
+            const namedValueKey = `${apiName}-${operation.operationId}-mock`;
+            await setNamedValue(namedValueKey, JSON.stringify(mockResponse), token);
+            
+            // Update operation policy
+            await patchApiPolicy(apiName, operation.operationId, token);
           } catch (error) {
-            console.error(`Failed to process operation ${operationId}:`, error);
-            // Continue with other operations even if one fails
+            console.error(`Failed to process operation ${operation.operationId}:`, error);
           }
         }
       }
     }
 
-    console.log('Successfully generated and uploaded all mock responses');
+    console.log('Successfully generated and uploaded all mock responses and policies');
   } catch (error) {
     console.error('Failed to generate mocks:', error);
     process.exit(1);

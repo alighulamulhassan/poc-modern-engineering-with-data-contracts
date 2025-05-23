@@ -12,7 +12,7 @@ on:
       - main
 
 jobs:
-  infrastructure-deployment:
+  apim-deployment:
     runs-on: ubuntu-latest
     environment: dev
     defaults:
@@ -58,8 +58,9 @@ jobs:
             -var="resource_group_name=${{ secrets.AZURE_APIM_RESOURCE_GROUP }}" \
             -var="location=${{ secrets.AZURE_LOCATION }}"
 
-  apim-mock-patch:
-    needs: infrastructure-deployment
+  apim-patch-mock-policies:
+    name: Generate and apply mock response policies
+    needs: apim-deployment
     runs-on: ubuntu-latest
     environment: dev
     defaults:

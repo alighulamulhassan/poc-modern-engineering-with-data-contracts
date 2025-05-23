@@ -1,13 +1,22 @@
-# Adapting Modern Engineering Practices
+# API-First Development with Azure APIM Mocking
 
 ## Overview
 This project demonstrates how to decouple the development lifecycle of the frontend from the backend by adopting an API design-first approach. The goal is to enable frontend teams to begin development in parallel with backend teams by providing reliable mock services early in the process.
 
-## Approach
-- **API Design First:** We prioritize designing and agreeing on API contracts before implementation begins. This ensures both frontend and backend teams have a clear, shared understanding of the interfaces.
-- **Mock Services:**
-  - **Azure API Management (APIM) Mocking:** We leverage Azure APIM's built-in mocking capabilities to provide cloud-based mock APIs. Frontend developers can connect to these mocks from their local environments, enabling early integration and testing.
-  - **Wiremock (Feasibility Study):** We are also evaluating the use of Wiremock for local mock service deployment. Wiremock can generate mocks directly from OpenAPI specifications, providing flexibility for local development and testing.
+## Pipeline Architecture
+
+The project uses a two-job pipeline for deploying APIs and mocks:
+
+### Job 1: Infrastructure Deployment
+- Creates APIM resources using Terraform
+- Imports OpenAPI specs into APIM
+- Creates basic API operations
+- Uses `main.tf` for core infrastructure
+
+### Job 2: Dynamic Mock Generation
+- Generates dynamic mocks using Prism CLI
+- Updates APIM operation policies via Azure API
+- Uses `generate-mocks.js` for mock generation and policy updates
 
 ## Benefits
 - **Parallel Development:** Frontend and backend teams can work independently, reducing bottlenecks and accelerating delivery.
@@ -15,70 +24,81 @@ This project demonstrates how to decouple the development lifecycle of the front
 - **Reduced Integration Risk:** Early and continuous integration with mock services helps identify issues sooner.
 
 ## Getting Started
-1. **API Design:** Define and agree on OpenAPI specifications for all endpoints.
-2. **Mock Deployment:**
-   - Use Azure APIM to deploy and manage cloud-based mocks.
-   - (Optional) Use Wiremock locally by generating stubs from OpenAPI specs.
-3. **Frontend Integration:** Point frontend applications to the mock endpoints for development and testing.
+1. **API Design:** Define and agree on OpenAPI specifications for all endpoints
+2. **Mock Deployment:** Deploy mocks to Azure APIM through the automated pipeline
+3. **Frontend Integration:** Point frontend applications to the mock endpoints for development and testing
 
 ## Directory Structure
 
 ```
-infra/               # Terraform for Azure APIM and mock policies
-sample-apis/         # OpenAPI specs (FHIR)
-README.md            # Project overview and instructions
+infra/               # Infrastructure and mock generation code
+  ├── main.tf       # Terraform configuration for APIM
+  ├── generate-mocks.js  # Mock generation and policy updates
+  └── templates/    # Policy templates
+sample-apis/        # OpenAPI specs
+  ├── patient-api.yaml   # FHIR Patient API spec
+  └── products-api.yaml  # Products API spec
 ```
 
 ## Infrastructure & CI/CD
-- **Terraform** (`infra/`): Provisions Azure APIM and configures mock policies.
+- **Terraform** (`infra/main.tf`): Provisions Azure APIM and creates API operations
 - **GitHub Actions** (`.github/workflows/`):
-  - `deploy-apim-mock.yaml`: Imports OpenAPI specs and enables APIM mocking.
+  - `deploy.yml`: Two-job pipeline that deploys APIs and configures mocks
 
-## Automated Dynamic Mocking with Prism and Terraform
+## Automated Dynamic Mocking
 
-This project automatically generates dynamic mock responses for each OpenAPI spec and injects them into Azure API Management (APIM) policies using Terraform. The process is fully automated via GitHub Actions and requires no manual steps after a PR is merged.
+This project automatically generates dynamic mock responses for each OpenAPI spec and updates Azure API Management (APIM) policies. The process is fully automated via GitHub Actions and requires no manual steps after a PR is merged.
 
 ### How it Works
 
-1. **OpenAPI Specs**: Place your OpenAPI 3.x YAML files in the `sample-apis/` directory.
-2. **Mock Generation**: On every push to `main`, the GitHub Actions workflow runs `infra/generate-mocks.js`, which:
-    - Uses [Prism](https://github.com/stoplightio/prism) to generate mock responses for each API operation.
-    - Updates `infra/main.tf` to inject the generated mock payloads into the APIM mock policy.
-3. **Terraform Apply**: The workflow then runs `terraform apply` to deploy the updated policies to Azure APIM.
+1. **OpenAPI Specs**: Place your OpenAPI 3.x YAML files in the `sample-apis/` directory
+2. **API Creation**: The first job in the pipeline:
+   - Uses Terraform to create APIs in APIM
+   - Imports OpenAPI specs
+   - Sets up basic API operations
+3. **Mock Generation**: The second job:
+   - Uses Prism to generate dynamic mock responses
+   - Creates named values in APIM for mock data
+   - Updates operation policies to serve mock responses
 
 ### Local Development
 
-To run the mock generation and update policies locally:
+To run the mock generation locally:
 
 ```sh
 cd infra
+npm install
 npm install -g @stoplight/prism-cli
+source ./set-env.sh  # Set required environment variables
 node generate-mocks.js
-terraform init
-terraform apply
 ```
 
-### CI/CD Automation
+### CI/CD Pipeline
 
-The workflow is defined in `.github/workflows/deploy.yml` and will:
-- Install dependencies
-- Generate mocks and update Terraform
-- Deploy to Azure APIM
+The workflow is defined in `.github/workflows/deploy.yml` and consists of:
+
+1. **apim-deploy job:**
+   - Creates/updates APIs in APIM using Terraform
+   - Imports latest OpenAPI specs
+
+2. **apim-mock-patch job:**
+   - Generates dynamic mocks using Prism
+   - Updates operation policies via Azure API
 
 ### Adding a New API
 
-1. Add your OpenAPI YAML file to `sample-apis/`.
-2. Commit and push to `main` (or open a PR and merge).
-3. The workflow will automatically generate the mock and update APIM.
-
----
-
-For more details, see `infra/generate-mocks.js` and the workflow file.
+1. Add your OpenAPI YAML file to `sample-apis/`
+2. Commit and push to `main` (or open a PR and merge)
+3. The pipeline will:
+   - Create the API in APIM
+   - Generate dynamic mocks
+   - Configure mock policies
 
 ## Future Work
-- Evaluate and document the pros and cons of Azure APIM vs. Wiremock for different use cases.
-- Automate the process of generating and deploying mocks from OpenAPI specs.
+- Support additional OpenAPI features and response types
+- Add validation for mock responses against schemas
+- Implement caching strategies for frequently accessed mocks
 
 ---
 
-*This project is a proof of concept for modernizing API-driven development workflows using Azure APIM mocking*
+*This project demonstrates modern API-first development practices using Azure APIM mocking*
