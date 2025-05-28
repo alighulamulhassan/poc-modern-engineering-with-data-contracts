@@ -1,0 +1,100 @@
+openapi: 3.0.0
+info:
+  title: Prescriptions API
+  version: 1.0.0
+  description: A simple API for managing medical prescriptions
+
+paths:
+  /prescriptions:
+    get:
+      operationId: listPrescriptions
+      summary: List all prescriptions
+      responses:
+        '200':
+          description: A list of prescriptions
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Prescription'
+    post:
+      operationId: createPrescription
+      summary: Create a new prescription
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/Prescription'
+      responses:
+        '201':
+          description: Prescription created successfully
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prescription'
+
+  /prescriptions/{id}:
+    get:
+      operationId: getPrescriptionById
+      summary: Get prescription by ID
+      parameters:
+        - name: id
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        '200':
+          description: Prescription details
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Prescription'
+
+components:
+  schemas:
+    Prescription:
+      type: object
+      required:
+        - id
+        - patientId
+        - medicationId
+        - status
+        - prescribedDate
+      properties:
+        id:
+          type: string
+          example: "PRESC-789"
+        patientId:
+          type: string
+          example: "PAT-456"
+        medicationId:
+          type: string
+          example: "MED-123"
+        status:
+          type: string
+          enum: [ACTIVE, COMPLETED, CANCELLED]
+          example: "ACTIVE"
+        prescribedDate:
+          type: string
+          format: date
+          example: "2024-03-20"
+        dosage:
+          type: string
+          example: "1 tablet twice daily"
+        duration:
+          type: integer
+          description: Duration in days
+          example: 7
+        notes:
+          type: string
+          example: "Take with food"
+        prescribedBy:
+          type: string
+          example: "DR-789"
+        lastUpdated:
+          type: string
+          format: date-time
+          example: "2024-03-20T10:30:00Z" 
