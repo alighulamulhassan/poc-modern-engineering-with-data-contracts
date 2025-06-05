@@ -1,0 +1,11 @@
+   1. OpenAPI Specs (sample-apis/*.yaml)
+      ↓
+   2. GitHub Actions Workflow (.github/workflows/infra-apim-deploy.yaml)
+      ↓
+   3. Terraform Configuration (infra/main.tf)
+      ↓
+   4. Mock Generation Script (infra/generate-mocks.js)
+      ↓
+   5. Policy Templates (infra/templates/*)
+      ↓
+   6. APIM Configuration

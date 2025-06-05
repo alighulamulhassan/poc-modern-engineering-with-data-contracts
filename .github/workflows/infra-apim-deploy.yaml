@@ -40,7 +40,7 @@ jobs:
             -backend-config="container_name=${{ secrets.AZURE_STORAGE_CONTAINER_NAME }}" \
             -backend-config="key=terraform.tfstate"
 
-      - name: Terraform Plan
+      - name: Terraform Plan#
         env:
             TF_LOG: INFO
         run: |
