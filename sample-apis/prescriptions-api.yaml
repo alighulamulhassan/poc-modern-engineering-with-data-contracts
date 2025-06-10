@@ -5,6 +5,19 @@ info:
   description: A simple API for managing medical prescriptions
 
 paths:
+  /prescriptions-old:
+    get:
+      operationId: listPrescriptionsOld
+      summary: List all prescriptions old
+      responses:
+        '200':
+          description: A list of prescriptions old
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: '#/components/schemas/Prescription'
   /prescriptions:
     get:
       operationId: listPrescriptions
