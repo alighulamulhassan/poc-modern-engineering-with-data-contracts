@@ -53,6 +53,22 @@ paths:
               schema:
                 $ref: '#/components/schemas/Prescription'
 
+  /prescriptions/ping:
+    get:
+      operationId: pingPrescriptions
+      summary: Ping endpoint for pipeline testing
+      responses:
+        '200':
+          description: Ping successful
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  message:
+                    type: string
+                    example: "Prescriptions API is up and running!"
+
 components:
   schemas:
     Prescription:
