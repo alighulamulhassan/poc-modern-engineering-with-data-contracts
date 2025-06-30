@@ -15,17 +15,15 @@ on:
         required: true
         type: string
 
-env:
-  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
-  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
-  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
-  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
-
 jobs:
   terraform-destroy:
     runs-on: ubuntu-latest
     environment: ${{ github.event.inputs.environment }}
-    
+    env:
+      TF_VAR_resource_group_name: ${{ secrets.RESOURCE_GROUP_NAME }}
+      TF_VAR_apim_name: ${{ secrets.APIM_NAME }}
+      TF_VAR_location: ${{ secrets.AZURE_LOCATION }}
+
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
@@ -35,6 +33,14 @@ jobs:
         run: |
           echo "Error: Confirmation text must be exactly 'DESTROY'"
           exit 1
+
+      - name: Azure Login (OIDC)
+        uses: azure/login@v2
+        with:
+          client-id: ${{ secrets.AZURE_CLIENT_ID }}
+          tenant-id: ${{ secrets.AZURE_TENANT_ID }}
+          subscription-id: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+          enable-AzPSSession: false
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
@@ -53,14 +59,21 @@ jobs:
       - name: Initialize Terraform
         working-directory: ./infra
         run: |
-          terraform init
+          terraform init \
+            -backend-config="storage_account_name=${{ secrets.STORAGE_ACCOUNT_NAME }}" \
+            -backend-config="container_name=${{ secrets.CONTAINER_NAME }}" \
+            -backend-config="key=terraform.tfstate" \
+            -backend-config="resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }}"
 
       - name: Terraform Destroy Plan
         working-directory: ./infra
         run: |
-          terraform plan -destroy -out=destroy.tfplan
+          terraform plan -destroy -out=destroy.tfplan \
+            -var="resource_group_name=${{ secrets.RESOURCE_GROUP_NAME }}" \
+            -var="apim_name=${{ secrets.APIM_NAME }}" \
+            -var="location=${{ secrets.AZURE_LOCATION }}"
 
       - name: Terraform Destroy
         working-directory: ./infra
         run: |
-          terraform apply "destroy.tfplan"
+          terraform apply -auto-approve "destroy.tfplan"
