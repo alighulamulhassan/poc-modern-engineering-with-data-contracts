@@ -1,0 +1,66 @@
+name: Terraform Destroy
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        description: 'Environment to destroy'
+        required: true
+        type: choice
+        options:
+          - dev
+          - staging
+      confirmation:
+        description: 'Type "DESTROY" to confirm destruction of resources'
+        required: true
+        type: string
+
+env:
+  ARM_CLIENT_ID: ${{ secrets.AZURE_CLIENT_ID }}
+  ARM_CLIENT_SECRET: ${{ secrets.AZURE_CLIENT_SECRET }}
+  ARM_SUBSCRIPTION_ID: ${{ secrets.AZURE_SUBSCRIPTION_ID }}
+  ARM_TENANT_ID: ${{ secrets.AZURE_TENANT_ID }}
+
+jobs:
+  terraform-destroy:
+    runs-on: ubuntu-latest
+    environment: ${{ github.event.inputs.environment }}
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Verify Destroy Confirmation
+        if: github.event.inputs.confirmation != 'DESTROY'
+        run: |
+          echo "Error: Confirmation text must be exactly 'DESTROY'"
+          exit 1
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '18'
+
+      - name: Install Dependencies
+        working-directory: ./infra
+        run: npm ci
+
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.5.0"
+
+      - name: Initialize Terraform
+        working-directory: ./infra
+        run: |
+          terraform init
+
+      - name: Terraform Destroy Plan
+        working-directory: ./infra
+        run: |
+          terraform plan -destroy -out=destroy.tfplan
+
+      - name: Terraform Destroy
+        working-directory: ./infra
+        run: |
+          terraform apply "destroy.tfplan"
