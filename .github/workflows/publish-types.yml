@@ -1,0 +1,39 @@
+name: Publish API Types
+
+on:
+  push:
+    paths:
+      - 'sample-apis/**/*.yaml'
+    branches:
+      - main
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          registry-url: 'https://npm.pkg.github.com'
+          scope: '@mhra'
+      
+      - name: Install dependencies
+        run: |
+          cd types-package
+          npm install
+      
+      - name: Generate and build types
+        run: |
+          cd types-package
+          npm run generate
+          npm run build
+      
+      - name: Publish to GitHub Packages
+        run: |
+          cd types-package
+          npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }} 

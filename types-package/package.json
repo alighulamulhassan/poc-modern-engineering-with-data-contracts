@@ -1,0 +1,29 @@
+{
+  "name": "@mhra/api-types",
+  "version": "1.0.0",
+  "description": "TypeScript types generated from MHRA OpenAPI specifications",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "generate": "ts-node scripts/generate-types.ts",
+    "prepublishOnly": "npm run generate && npm run build"
+  },
+  "files": [
+    "dist"
+  ],
+  "keywords": [
+    "mhra",
+    "types",
+    "openapi",
+    "typescript"
+  ],
+  "author": "MHRA",
+  "license": "MIT",
+  "devDependencies": {
+    "@types/node": "^20.11.24",
+    "swagger-typescript-api": "^12.0.4",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  }
+} 
