@@ -1,6 +1,6 @@
 openapi: 3.0.1
 info:
-  title: Cars API 1
+  title: Cars API 1.0
   description: Sample Cars API for testing mock responses
   version: 1.0.0
 servers:
