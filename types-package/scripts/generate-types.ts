@@ -25,7 +25,6 @@ apiFiles.forEach(async (file) => {
       name: `${apiName}.ts`,
       output: OUTPUT_DIR,
       input: inputPath,
-      spec: inputPath,
       generateClient: false,
       generateRouteTypes: true,
       generateResponses: true,
