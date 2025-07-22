@@ -2,9 +2,6 @@ name: Publish API Types
 
 on:
   push:
-    paths:
-      - 'sample-apis/**/*.yaml'
-      - '*'
     branches:
       - main
 
@@ -37,4 +34,4 @@ jobs:
           cd types-package
           npm publish
         env:
-          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }} 
+          NODE_AUTH_TOKEN: ${{ secrets.NODE_AUTH_TOKEN }}
