@@ -1,5 +1,5 @@
 {
-  "name": "@mhra/api-types",
+  "name": "@infinityworks/api-types",
   "version": "1.0.0",
   "description": "TypeScript types generated from MHRA OpenAPI specifications",
   "main": "dist/index.js",
