@@ -3,6 +3,7 @@ graph TB
     subgraph "Frontend Tools"
         A[OpenAPI Specs - YAML]
         B[Prism CLI - Mock Generator]
+        J[TypeScript Contract Generator]
     end
     
     subgraph "Infrastructure as Code"
@@ -23,4 +24,10 @@ graph TB
         H[Azure APIM]
         I[Azure Storage - Backend State]
     end
+    
+    subgraph "NPM Registry"
+        K[NPM Package: TypeScript Data Contracts]
+    end
+    
+    J --> K
 ```

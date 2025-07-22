@@ -6,18 +6,25 @@ graph TB
     end
     
     subgraph "GitHub Actions Pipeline"
-        C --> D[Job 1: Infrastructure Deployment]
-        D --> E[Job 2: Mock Generation]
+        C --> D[Infra & APIM Deployment]
+        C --> E[Mock Generation]
+        C --> F[TypeScript Contract Generation]
     end
     
     subgraph "Azure Cloud"
-        D --> F[Azure APIM Service]
-        E --> F
-        F --> G[Mock Endpoints]
+        D --> G[Azure APIM Service]
+        E --> G
+        G --> H[Mock Endpoints]
+    end
+    
+    subgraph "NPM Registry"
+        F --> I[NPM Package: TypeScript Data Contracts]
     end
     
     subgraph "Development Teams"
-        G --> H[Frontend Team]
-        G --> I[Backend Team]
+        H --> J[Frontend Team]
+        H --> K[Backend Team]
+        I --> J
+        I --> K
     end
 ```

@@ -5,14 +5,19 @@ graph LR
         B[sample-apis/]
         C[infra/]
         D[.github/workflows/]
+        E[types-package/]
+        F[NPM Registry]
         
         A --> B
         A --> C
         A --> D
+        A --> E
         
-        B --> E[OpenAPI Specs]
-        C --> F[Terraform Config]
-        C --> G[Mock Generation]
-        D --> H[CI/CD Pipeline]
+        B --> G[OpenAPI Specs]
+        C --> H[Terraform Config]
+        C --> I[Mock Generation]
+        D --> J[CI/CD Pipeline]
+        E --> K[TypeScript Data Contracts]
+        K --> F
     end
 ```
