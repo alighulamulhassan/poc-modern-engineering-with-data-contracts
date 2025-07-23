@@ -1,5 +1,5 @@
 import React from "react";
-import { Car } from "@infinityworks/api-types";
+import { Car } from "@alighulamulhassan/api-types";
 
 const exampleCar: Car = {
   id: "car-123",

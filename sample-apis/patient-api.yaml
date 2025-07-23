@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: MHRA Patient API
   description: Sample FHIR-based Patient API for MHRA
-  version: 1.0.0
+  version: 1.0.1
 servers:
   - url: https://api.mhra.example.com/v1
 paths:

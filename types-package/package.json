@@ -1,6 +1,6 @@
 {
-  "name": "@infinityworks/api-types",
-  "version": "1.0.0",
+  "name": "@alighulamulhassan/api-types",
+  "version": "1.0.6",
   "description": "TypeScript types generated from MHRA OpenAPI specifications",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -21,9 +21,11 @@
   "author": "MHRA",
   "license": "MIT",
   "devDependencies": {
+    "@types/js-yaml": "^4.0.9",
     "@types/node": "^20.11.24",
+    "js-yaml": "^4.1.0",
     "swagger-typescript-api": "^12.0.4",
     "ts-node": "^10.9.2",
     "typescript": "^5.3.3"
   }
-} 
+}

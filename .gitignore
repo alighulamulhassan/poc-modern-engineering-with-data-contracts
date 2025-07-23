@@ -1,2 +1,4 @@
 types-package/node_modules
 types-package/dist
+sample-consumer/.npmrc
+sample-consumer/node_modules

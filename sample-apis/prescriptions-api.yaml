@@ -1,7 +1,7 @@
 openapi: 3.0.0
 info:
   title: Prescriptions API
-  version: 1.0.0
+  version: 1.0.4
   description: A simple API for managing medical prescriptions
 
 paths:
