@@ -2,7 +2,7 @@ openapi: 3.0.1
 info:
   title: Cars API 1.0
   description: Sample Cars API for testing mock responses
-  version: 1.0.7
+  version: 1.0.10
 servers:
   - url: https://api.example.com/v1
 paths:

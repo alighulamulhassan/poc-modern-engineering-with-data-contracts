@@ -1,10 +1,10 @@
 {
   "name": "sample-consumer",
-  "version": "1.0.0",
+  "version": "1.0.6",
   "private": true,
   "type": "module",
   "dependencies": {
-    "@alighulamulhassan/api-types": "^1.0.1",
+    "@alighulamulhassan/api-types": "^1.0.9",
     "react": "^18.0.0",
     "react-dom": "^18.0.0"
   },
