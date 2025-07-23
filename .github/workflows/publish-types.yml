@@ -29,6 +29,9 @@ jobs:
           npm run generate
           npm run build
       
+      - name: Set up .npmrc for GitHub Packages
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > ~/.npmrc
+
       - name: Publish to GitHub Packages
         run: |
           cd types-package
