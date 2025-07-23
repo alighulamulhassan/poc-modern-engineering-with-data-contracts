@@ -30,7 +30,9 @@ jobs:
           npm run build
       
       - name: Set up .npmrc for GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > types-package/.npmrc
+        run: |
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > types-package/.npmrc
+          echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > /home/runner/work/_temp/.npmrc
 
       - name: Publish to GitHub Packages
         run: |
