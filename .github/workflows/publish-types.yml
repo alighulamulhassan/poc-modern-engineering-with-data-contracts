@@ -16,7 +16,7 @@ jobs:
         with:
           node-version: '20'
           registry-url: 'https://npm.pkg.github.com'
-          scope: '@mhra'
+          scope: '@alighulamulhassan'
       
       - name: Install dependencies
         run: |
@@ -30,7 +30,7 @@ jobs:
           npm run build
       
       - name: Set up .npmrc for GitHub Packages
-        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > ~/.npmrc
+        run: echo "//npm.pkg.github.com/:_authToken=${{ secrets.NODE_AUTH_TOKEN }}" > types-package/.npmrc
 
       - name: Publish to GitHub Packages
         run: |
