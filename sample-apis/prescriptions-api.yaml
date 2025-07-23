@@ -79,8 +79,12 @@ components:
         - medicationId
         - status
         - prescribedDate
+        - tapashFieldRequested
       properties:
         id:
+          type: string
+          example: "PRESC-789"
+        tapashFieldRequested:
           type: string
           example: "PRESC-789"
         patientId:
